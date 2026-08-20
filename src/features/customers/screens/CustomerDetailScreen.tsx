@@ -1,3 +1,6 @@
+/* eslint-disable no-nested-ternary */
+/* eslint-disable complexity */
+/* eslint-disable no-duplicate-imports */
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Linking, Alert } from 'react-native';
 import { Text, useTheme, Card, Button, Portal, Dialog, TextInput } from 'react-native-paper';

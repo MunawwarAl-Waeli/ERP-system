@@ -16,15 +16,17 @@ export interface PrinterConfig {
 }
 
 // ── Cart Item (billing session) ──
+// core/types/index.ts
 export interface CartItem {
   productId: string;
+  productUnitId: string;       // ✅ جديد (لدعم الوحدات)
   productName: string;
+  unitName: string;            // ✅ جديد (لعرض اسم الوحدة)
   quantity: number;
   unitPrice: number;
   discount: number;
-  total: number;
-  unit: ProductUnit;
-  availableStock: number;
+  total: number;               // محسوب تلقائياً
+  costAtSale?: number;         // جديد (سيتم تحديثه بعد الترحيل)
 }
 
 // ── Date Range ──

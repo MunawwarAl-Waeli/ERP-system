@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
-import { database } from '@core/database';
-import Bill from '@core/database/models/Bill';
-import Customer from '@core/database/models/Customer';
-import Product from '@core/database/models/Product';
-import CreditEntry from '@core/database/models/CreditEntry';
-import { Q } from '@nozbe/watermelondb';
-import { getStartOfDay, getEndOfDay, getStartOfMonth } from '@shared/utils/date';
-import { BILL_STATUSES } from '@core/constants';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from "react";
+import { database, SalesInvoice } from "@core/database";
+import Customer from "@core/database/models/Customer";
+import Product from "@core/database/models/Product";
+import { Q } from "@nozbe/watermelondb";
+import {
+  getStartOfDay,
+  getEndOfDay,
+  getStartOfMonth,
+} from "@shared/utils/date";
+import { BILL_STATUSES } from "@core/constants";
+import { inventoryRepository } from "@features/inventory/repositories/inventoryRepository";
 
 interface DashboardData {
   todaySales: number;
@@ -16,9 +20,57 @@ interface DashboardData {
   totalUdhar: number;
   lowStockProducts: number;
   outOfStockProducts: number;
-  recentBills: Bill[];
+  recentBills: SalesInvoice[];
   isLoading: boolean;
 }
+
+// دالة مستقلة لحساب الديون المستحقة لتقليل التعقيد وتجنب التداخل العميق
+const calculateTotalUdhar = async (
+  customersCollection: any,
+  creditEntriesCollection: any,
+): Promise<number> => {
+  const allCustomers = await customersCollection
+    .query(Q.where("is_active", true))
+    .fetch();
+  let total = 0;
+
+  for (const customer of allCustomers) {
+    const latestEntries = await creditEntriesCollection
+      .query(
+        Q.where("customer_id", customer.id),
+        Q.sortBy("created_at", Q.desc),
+        Q.take(1),
+      )
+      .fetch();
+
+    if (latestEntries.length > 0) {
+      const entry = latestEntries[0] as unknown as { balanceAfter?: number };
+      total += entry.balanceAfter || 0;
+    }
+  }
+
+  return total;
+};
+
+// دالة مستقلة لحساب حالة المخزون
+const calculateStockStatus = async (productsCollection: any) => {
+  const allProducts = await productsCollection
+    .query(Q.where("is_active", true))
+    .fetch();
+  let lowStock = 0;
+  let outOfStock = 0;
+
+  for (const product of allProducts) {
+    const stock = await inventoryRepository.getProductStock(product.id);
+    if (stock <= 0) {
+      outOfStock++;
+    } else if (stock <= (product.minStock || 0)) {
+      lowStock++;
+    }
+  }
+
+  return { lowStock, outOfStock };
+};
 
 export const useDashboardData = (): DashboardData => {
   const [data, setData] = useState<DashboardData>({
@@ -34,6 +86,8 @@ export const useDashboardData = (): DashboardData => {
   });
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadDashboardData = async () => {
       try {
         const now = new Date();
@@ -41,130 +95,106 @@ export const useDashboardData = (): DashboardData => {
         const todayEnd = getEndOfDay(now).valueOf();
         const monthStart = getStartOfMonth(now).valueOf();
 
-        const billsCollection = database.get<Bill>('bills');
-        const customersCollection = database.get<Customer>('customers');
-        const productsCollection = database.get<Product>('products');
+        const billsCollection = database.get<SalesInvoice>("sales_invoices");
+        const customersCollection = database.get<Customer>("customers");
+        const productsCollection = database.get<Product>("products");
+        const creditEntriesCollection = database.get("journal_entries");
 
-        // Today's bills
+        // مبيعات اليوم
         const todayBills = await billsCollection
           .query(
-            Q.where('created_at', Q.gte(todayStart)),
-            Q.where('created_at', Q.lte(todayEnd)),
-            Q.where('status', Q.notEq(BILL_STATUSES.CANCELLED)),
+            Q.where("created_at", Q.gte(todayStart)),
+            Q.where("created_at", Q.lte(todayEnd)),
+            Q.where("status", Q.notEq(BILL_STATUSES.CANCELLED)),
           )
           .fetch();
 
-        const todaySales = todayBills.reduce((sum, bill) => sum + bill.grandTotal, 0);
+        const todaySales = todayBills.reduce(
+          (sum, bill) => sum + (bill.total || 0),
+          0,
+        );
 
-        // Month's bills
+        // مبيعات الشهر
         const monthBills = await billsCollection
           .query(
-            Q.where('created_at', Q.gte(monthStart)),
-            Q.where('status', Q.notEq(BILL_STATUSES.CANCELLED)),
+            Q.where("created_at", Q.gte(monthStart)),
+            Q.where("status", Q.notEq(BILL_STATUSES.CANCELLED)),
           )
           .fetch();
 
-        const monthSales = monthBills.reduce((sum, bill) => sum + bill.grandTotal, 0);
+        const monthSales = monthBills.reduce(
+          (sum, bill) => sum + (bill.total || 0),
+          0,
+        );
 
-        // Total customers
+        // إجمالي العملاء النشطين
         const activeCustomers = await customersCollection
-          .query(Q.where('is_active', true))
+          .query(Q.where("is_active", true))
           .fetchCount();
 
-        // Total outstanding credit (udhar)
-        const creditEntriesCollection = database.get<CreditEntry>('credit_entries');
-        const allCustomers = await customersCollection
-          .query(Q.where('is_active', true))
-          .fetch();
+        // إجمالي الديون المستحقة
+        const totalUdhar = await calculateTotalUdhar(
+          customersCollection,
+          creditEntriesCollection,
+        );
 
-        let totalUdhar = 0;
-        for (const customer of allCustomers) {
-          const latestEntries = await creditEntriesCollection
-            .query(
-              Q.where('customer_id', customer.id),
-              Q.sortBy('created_at', Q.desc),
-              Q.take(1),
-            )
-            .fetch();
-          if (latestEntries.length > 0) {
-            totalUdhar += latestEntries[0].balanceAfter;
-          }
-        }
+        // حالة المخزون
+        const { lowStock, outOfStock } = await calculateStockStatus(
+          productsCollection,
+        );
 
-        // Low stock & out of stock
-        const allProducts = await productsCollection
-          .query(Q.where('is_active', true))
-          .fetch();
-
-        const lowStockProducts = allProducts.filter(
-          (p) => p.currentStock > 0 && p.currentStock <= p.lowStockThreshold,
-        ).length;
-
-        const outOfStockProducts = allProducts.filter(
-          (p) => p.currentStock <= 0,
-        ).length;
-
-        // Recent bills (last 5)
+        // أحدث الفواتير
         const recentBills = await billsCollection
-          .query(
-            Q.sortBy('created_at', Q.desc),
-            Q.take(5),
-          )
+          .query(Q.sortBy("created_at", Q.desc), Q.take(5))
           .fetch();
 
-        setData({
-          todaySales,
-          todayBillCount: todayBills.length,
-          monthSales,
-          totalCustomers: activeCustomers,
-          totalUdhar,
-          lowStockProducts,
-          outOfStockProducts,
-          recentBills,
-          isLoading: false,
-        });
+        if (isMounted) {
+          setData({
+            todaySales,
+            todayBillCount: todayBills.length,
+            monthSales,
+            totalCustomers: activeCustomers,
+            totalUdhar,
+            lowStockProducts: lowStock,
+            outOfStockProducts: outOfStock,
+            recentBills,
+            isLoading: false,
+          });
+        }
       } catch (error) {
-        console.error('Error loading dashboard data:', error);
-        setData((prev) => ({ ...prev, isLoading: false }));
+        console.error("Error loading dashboard data:", error);
+        if (isMounted) {
+          setData((prev) => ({ ...prev, isLoading: false }));
+        }
       }
     };
 
     loadDashboardData();
 
-    // Subscribe to changes in bills, products, credit_entries, and customers tables
+    // الاشتراكات لتحديث اللوحة فورياً
     const billsSub = database
-      .get<Bill>('bills')
+      .get<SalesInvoice>("sales_invoices")
       .query()
       .observe()
-      .subscribe(() => {
-        loadDashboardData();
-      });
-
+      .subscribe(loadDashboardData);
     const productsSub = database
-      .get<Product>('products')
+      .get<Product>("products")
       .query()
       .observe()
-      .subscribe(() => {
-        loadDashboardData();
-      });
-
+      .subscribe(loadDashboardData);
     const creditSub = database
-      .get<CreditEntry>('credit_entries')
+      .get("journal_entries")
       .query()
       .observe()
-      .subscribe(() => {
-        loadDashboardData();
-      });
-
+      .subscribe(loadDashboardData);
     const customersSub = database
-      .get<Customer>('customers')
+      .get<Customer>("customers")
       .query()
       .observe()
-      .subscribe(() => {
-        loadDashboardData();
-      });
+      .subscribe(loadDashboardData);
 
     return () => {
+      isMounted = false;
       billsSub.unsubscribe();
       productsSub.unsubscribe();
       creditSub.unsubscribe();

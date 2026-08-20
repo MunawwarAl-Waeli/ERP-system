@@ -1,6 +1,9 @@
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import type {
+  CompositeScreenProps,
+  NavigatorScreenParams,
+} from "@react-navigation/native";
 
 // ── Dashboard Stack ──
 export type DashboardStackParamList = {
@@ -26,8 +29,8 @@ export type InventoryStackParamList = {
 // ── Billing Stack ──
 export type BillingStackParamList = {
   BillingHome: undefined;
-  BillPreview: { billId: string };
-  BillHistory: undefined;
+  SalesInvoiceDetail: { billId: string };
+  SalesInvoiceList: undefined;
 };
 
 // ── More (Reports + Settings) Stack ──
@@ -39,6 +42,8 @@ export type MoreStackParamList = {
   InventoryReport: undefined;
   ProductPerformance: undefined;
   Settings: undefined;
+  ChartOfAccounts: undefined;
+  AccountingSettings: undefined;
 };
 
 // ── Main Tab Navigator ──

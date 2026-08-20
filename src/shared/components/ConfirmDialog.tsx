@@ -23,6 +23,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   onDismiss,
   destructive = false,
+
 }) => {
   const theme = useAppTheme();
 

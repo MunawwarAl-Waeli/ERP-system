@@ -26,7 +26,7 @@ export const TodaySalesHero: React.FC<TodaySalesHeroProps> = ({
         <View style={[styles.container, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.shadow }]}>
             <View style={styles.heroContent}>
                 <View style={styles.mainStat}>
-                    <Text variant="labelLarge" style={[styles.whiteLabel, { color: onPrimary + 'CC' }]}>
+                    <Text variant="labelLarge" style={[styles.whiteLabel, { color: `${onPrimary}CC` }]}>
                         {t('todaySales')}
                     </Text>
                     <CurrencyText
@@ -38,24 +38,24 @@ export const TodaySalesHero: React.FC<TodaySalesHeroProps> = ({
 
                 <View style={styles.subStats}>
                     <View style={styles.subStat}>
-                        <View style={[styles.subStatIcon, { backgroundColor: onPrimary + '33' }]}>
+                        <View style={[styles.subStatIcon, { backgroundColor: `${onPrimary}33` }]}>
                             <AppIcon name="receipt" size={16} color={onPrimary} />
                         </View>
                         <View>
                             <Text variant="titleMedium" style={{ color: onPrimary, fontWeight: '700' }}>
                                 {todayBillCount}
                             </Text>
-                            <Text variant="labelSmall" style={{ color: onPrimary + 'B3', marginTop: 1 }}>
+                            <Text variant="labelSmall" style={{ color: `${onPrimary}B3`, marginTop: 1 }}>
                                 {t('bills')}
                             </Text>
                         </View>
                     </View>
 
-                    <View style={[styles.subStatDivider, { backgroundColor: onPrimary + '4D' }]} />
+                    <View style={[styles.subStatDivider, { backgroundColor: `${onPrimary}4D` }]} />
 
                     <View style={styles.subStat}>
-                        <View style={[styles.subStatIcon, { backgroundColor: onPrimary + '33' }]}>
-                            <AppIcon name="chart-line" size={16} color={onPrimary} />
+                        <View style={[styles.subStatIcon, { backgroundColor: `${onPrimary}33` }]}>
+                            <AppIcon name="chart-line" size= {16} color={onPrimary} />
                         </View>
                         <View>
                             <CurrencyText
@@ -63,7 +63,7 @@ export const TodaySalesHero: React.FC<TodaySalesHeroProps> = ({
                                 variant="titleMedium"
                                 color={onPrimary}
                             />
-                            <Text variant="labelSmall" style={{ color: onPrimary + 'B3', marginTop: 1 }}>
+                            <Text variant="labelSmall" style={{ color: `${onPrimary}B3`, marginTop: 1 }}>
                                 {t('avgBillValue')}
                             </Text>
                         </View>
@@ -72,10 +72,10 @@ export const TodaySalesHero: React.FC<TodaySalesHeroProps> = ({
             </View>
 
             {/* Monthly trend strip */}
-            <View style={[styles.monthStrip, { backgroundColor: onPrimary + '1A' }]}>
+            <View style={[styles.monthStrip, { backgroundColor: `${onPrimary}1A` }]}>
                 <View style={styles.monthStripContent}>
-                    <AppIcon name="chart-bar" size={16} color={onPrimary + 'B3'} />
-                    <Text variant="labelMedium" style={{ color: onPrimary + 'CC' }}>
+                    <AppIcon name="chart-bar" size={16} color={`${onPrimary}B3`} />
+                    <Text variant="labelMedium" style={{ color: `${onPrimary}CC` }}>
                         {t('monthSales')}
                     </Text>
                 </View>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   LayoutDashboard,
   Users,
@@ -68,124 +68,148 @@ import {
   Drumstick,
   Container,
   type LucideProps,
-} from 'lucide-react-native';
+  FolderOpen,
+  Folder,
+  PlusCircle,
+  Landmark,
+  Scale,
+  Shield,
+  TrendingDown,
+  Square,
+  MinusSquare,
+} from "lucide-react-native";
 
 // Map from MaterialCommunityIcons names → Lucide components
 const iconMap: Record<string, React.FC<LucideProps>> = {
   // Navigation
-  'view-dashboard': LayoutDashboard,
-  'account-group': Users,
-  'receipt': Receipt,
-  'package-variant-closed': PackageOpen,
-  'package-variant': Package,
-  'dots-horizontal': MoreHorizontal,
+  "view-dashboard": LayoutDashboard,
+  "account-group": Users,
+  receipt: Receipt,
+  "package-variant-closed": PackageOpen,
+  "package-variant": Package,
+  "dots-horizontal": MoreHorizontal,
 
   // Dashboard / Reports
-  'chart-line': TrendingUp,
-  'account-cash': HandCoins,
-  'chart-bar': BarChart3,
-  'chevron-right': ChevronRight,
-  'chevron-down': ChevronDown,
-  'chevron-left': ChevronLeft,
-  'arrow-left': ArrowLeft,
-  'arrow-up-down': ArrowUpDown,
-  'sort': ArrowUpDown,
-  'menu-down': ChevronDown,
+  "chart-line": TrendingUp,
+  "account-cash": HandCoins,
+  "chart-bar": BarChart3,
+  "chevron-right": ChevronRight,
+  "chevron-down": ChevronDown,
+  "chevron-left": ChevronLeft,
+  "arrow-left": ArrowLeft,
+  "arrow-up-down": ArrowUpDown,
+  sort: ArrowUpDown,
+  "menu-down": ChevronDown,
 
   // Products
-  'tag': Tag,
-  'barcode': Barcode,
+  tag: Tag,
+  barcode: Barcode,
 
   // Alerts
-  'alert-circle': AlertCircle,
+  "alert-circle": AlertCircle,
 
   // Customers
-  'phone': Phone,
-  'map-marker': MapPin,
-  'note-text': StickyNote,
+  phone: Phone,
+  "map-marker": MapPin,
+  "note-text": StickyNote,
 
   // Auth
-  'backspace-outline': Delete,
+  "backspace-outline": Delete,
 
   // Settings
-  'cog': Settings,
-  'printer': Printer,
-  'lock-reset': LockKeyhole,
+  cog: Settings,
+  printer: Printer,
+  "lock-reset": LockKeyhole,
 
   // Backup
-  'export': Upload,
-  'import': Download,
+  export: Upload,
+  import: Download,
 
   // Actions
-  'close': X,
-  'x': X,
-  'plus': Plus,
-  'minus': Minus,
-  'account-plus': UserPlus,
-  'cash-plus': BadgeIndianRupee,
-  'delete-sweep': Trash2,
-  'delete': Trash2,
-  'trash-2': Trash2,
-  'pencil': Pencil,
-  'check': Check,
+  close: X,
+  x: X,
+  plus: Plus,
+  minus: Minus,
+  "account-plus": UserPlus,
+  "cash-plus": BadgeIndianRupee,
+  "delete-sweep": Trash2,
+  delete: Trash2,
+  "trash-2": Trash2,
+  pencil: Pencil,
+  check: Check,
 
   // Billing
-  'magnify': Search,
-  'search': Search,
-  'cash': Banknote,
-  'cellphone': Smartphone,
-  'credit-card': CreditCard,
-  'account-clock': Clock,
-  'cart-outline': ShoppingCart,
-  'account': User,
-  'user': User,
-  'history': History,
-  'plus-minus': Plus,
-  'share-variant': Share2,
+  magnify: Search,
+  search: Search,
+  cash: Banknote,
+  cellphone: Smartphone,
+  "credit-card": CreditCard,
+  "account-clock": Clock,
+  "cart-outline": ShoppingCart,
+  account: User,
+  user: User,
+  history: History,
+  "plus-minus": Plus,
+  "share-variant": Share2,
 
   // Printing
-  'bluetooth': Bluetooth,
+  bluetooth: Bluetooth,
 
   // Documents
-  'file-text': FileText,
+  "file-text": FileText,
 
   // Misc
-  'check-circle-outline': CheckCircle2,
+  "check-circle-outline": CheckCircle2,
 
   // Password visibility
-  'eye': Eye,
-  'eye-off': EyeOff,
-  'eye-outline': Eye,
-  'eye-off-outline': EyeOff,
+  eye: Eye,
+  "eye-off": EyeOff,
+  "eye-outline": Eye,
+  "eye-off-outline": EyeOff,
 
   // Google Drive / Sync
-  'cloud': Cloud,
-  'log-in': LogIn,
-  'log-out': LogOut,
-  'refresh-cw': RefreshCw,
+  cloud: Cloud,
+  "log-in": LogIn,
+  "log-out": LogOut,
+  "refresh-cw": RefreshCw,
 
   // Data
-  'database': Database,
+  database: Database,
 
   // Status
-  'check-circle': CheckCircle2,
+  "check-circle": CheckCircle2,
 
   // Product Categories (kirana store)
-  'coffee': Coffee,
-  'cookie': Cookie,
-  'cup-water': CupSoda,
-  'grain': Wheat,
-  'barley': Wheat,
-  'peanut': Nut,
-  'cow': Milk,
-  'bottle-tonic': FlaskConical,
-  'food-drumstick': Drumstick,
-  'face-man-shimmer': Sparkles,
-  'candle': Flame,
-  'food-variant': UtensilsCrossed,
-  'hand-wash': Droplets,
-  'shaker-outline': Container,
-  'cube-outline': Box,
+  coffee: Coffee,
+  cookie: Cookie,
+  "cup-water": CupSoda,
+  grain: Wheat,
+  barley: Wheat,
+  peanut: Nut,
+  cow: Milk,
+  "bottle-tonic": FlaskConical,
+  "food-drumstick": Drumstick,
+  "face-man-shimmer": Sparkles,
+  candle: Flame,
+  "food-variant": UtensilsCrossed,
+  "hand-wash": Droplets,
+  "shaker-outline": Container,
+  "cube-outline": Box,
+
+  // Accounting
+  "plus-circle": PlusCircle,
+  // 'pencil': Pencil,
+  "pencil-outline": Pencil, // مترادف
+  folder: Folder,
+  landmark: Landmark, // بديل bank
+  scale: Scale, // ميزان للخصوم
+  "scale-balance": Scale, // مترادف للحفاظ على التوافق
+  shield: Shield, // درع لحقوق الملكية
+  "shield-account": Shield, // مترادف
+  "trending-down": TrendingDown,
+  square: Square, // مربع فارغ للـ checkbox
+  "checkbox-blank": Square, // مترادف
+  "minus-square": MinusSquare, // لاحقًا لو احتجنا
 };
 
 export interface AppIconProps {
@@ -199,7 +223,12 @@ export interface AppIconProps {
  * Drop-in replacement for react-native-vector-icons Icon.
  * Uses Lucide SVG icons — no native font linking needed.
  */
-export const AppIcon: React.FC<AppIconProps> = ({ name, size = 24, color, style }) => {
+export const AppIcon: React.FC<AppIconProps> = ({
+  name,
+  size = 24,
+  color,
+  style,
+}) => {
   const LucideComponent = iconMap[name];
   if (!LucideComponent) {
     console.warn(`[AppIcon] Unknown icon name: "${name}"`);

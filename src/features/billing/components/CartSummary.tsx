@@ -1,51 +1,64 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, useTheme, Divider } from 'react-native-paper';
-import { useTranslation } from 'react-i18next';
-import { CurrencyText } from '@shared/components/CurrencyText';
-import { CURRENCY_SYMBOL } from '@core/constants';
+// components/CartSummary.tsx
+import React from "react";
+import { View, StyleSheet } from "react-native";
+import { Text, useTheme, Divider } from "react-native-paper";
+import { useTranslation } from "react-i18next";
+import { CurrencyText } from "@shared/components/CurrencyText";
 
 interface CartSummaryProps {
   subtotal: number;
-  discount: number;
+  discountTotal: number; // ✅ تم تغيير الاسم من discount إلى discountTotal
   grandTotal: number;
   itemCount: number;
 }
 
 export const CartSummary: React.FC<CartSummaryProps> = ({
   subtotal,
-  discount,
+  discountTotal,
   grandTotal,
   itemCount,
 }) => {
   const theme = useTheme();
-  const { t } = useTranslation('billing');
+  const { t } = useTranslation("billing");
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.surfaceVariant }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.surfaceVariant },
+      ]}
+    >
       <View style={styles.row}>
-        <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-          {t('subtotal')} ({t('itemCount', { count: itemCount })})
+        <Text
+          variant="bodyMedium"
+          style={{ color: theme.colors.onSurfaceVariant }}
+        >
+          {t("subtotal")} ({t("itemCount", { count: itemCount })})
         </Text>
         <CurrencyText amount={subtotal} variant="bodyMedium" />
       </View>
 
-      {discount > 0 && (
+      {discountTotal > 0 && (
         <View style={styles.row}>
           <Text variant="bodyMedium" style={{ color: theme.colors.primary }}>
-            {t('discount')}
+            {t("discount")}
           </Text>
-          <Text variant="bodyMedium" style={{ color: theme.colors.primary }}>
-            - {CURRENCY_SYMBOL}{discount.toFixed(2)}
-          </Text>
+          <CurrencyText
+            amount={-discountTotal}
+            variant="bodyMedium"
+            style={{ color: theme.colors.primary }}
+          />
         </View>
       )}
 
       <Divider style={styles.divider} />
 
       <View style={styles.row}>
-        <Text variant="titleLarge" style={{ color: theme.colors.onSurface, fontWeight: '700' }}>
-          {t('grandTotal')}
+        <Text
+          variant="titleLarge"
+          style={{ color: theme.colors.onSurface, fontWeight: "700" }}
+        >
+          {t("grandTotal")}
         </Text>
         <CurrencyText amount={grandTotal} variant="titleLarge" />
       </View>
@@ -62,9 +75,9 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 4,
   },
   divider: {

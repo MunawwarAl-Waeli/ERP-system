@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable react/no-multi-comp */
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, useTheme, Surface, Divider } from 'react-native-paper';

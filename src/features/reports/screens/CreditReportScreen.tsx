@@ -34,7 +34,7 @@ export const CreditReportScreen: React.FC<{ navigation: NavigationProp }> = ({ n
         return <LoadingOverlay visible />;
     }
 
-    const renderCustomer = ({ item, index }: { item: CustomerCreditInfo; index: number }) => (
+    const renderCustomer = ({ item }: { item: CustomerCreditInfo; index: number }) => (
         <Surface style={styles.customerCard} elevation={1}>
             <View style={styles.customerRow}>
                 {/* Avatar / Rank */}

@@ -11,6 +11,19 @@ import enInventory from './locales/en/inventory.json';
 import enBilling from './locales/en/billing.json';
 import enReports from './locales/en/reports.json';
 import enSettings from './locales/en/settings.json';
+import enAccounting from './locales/en/accounting.json'; // 👈 تأكد من استيراد ملف الحسابات
+
+import arCommon from './locales/ar/common.json';
+import arAuth from './locales/ar/auth.json';
+import arDashboard from './locales/ar/dashboard.json';
+import arCustomers from './locales/ar/customers.json';
+import arProducts from './locales/ar/products.json';
+import arInventory from './locales/ar/inventory.json';
+import arBilling from './locales/ar/billing.json';
+import arReports from './locales/ar/reports.json';
+import arSettings from './locales/ar/settings.json';
+import arAccounting from './locales/ar/accounting.json'; // 👈 تأكد من استيراد ملف الحسابات
+
 
 import hiCommon from './locales/hi/common.json';
 import hiAuth from './locales/hi/auth.json';
@@ -33,7 +46,20 @@ import guReports from './locales/gu/reports.json';
 import guSettings from './locales/gu/settings.json';
 
 const resources = {
-  en: {
+  ar: {
+
+    common: arCommon,
+    auth:      arAuth,
+    dashboard: arDashboard,
+    customers: arCustomers,
+    products: arProducts,
+    inventory: arInventory,
+    billing: arBilling,
+    reports: arReports,
+    settings: arSettings,
+    accounting: arAccounting, // 👈 إضافة ملف الحسابات
+  }, 
+   en: {
     common: enCommon,
     auth: enAuth,
     dashboard: enDashboard,
@@ -43,6 +69,7 @@ const resources = {
     billing: enBilling,
     reports: enReports,
     settings: enSettings,
+    accounting: enAccounting, // 👈 إضافة ملف الحسابات
   },
   hi: {
     common: hiCommon,
@@ -73,6 +100,7 @@ const savedLanguage = getLanguage();
 i18n.use(initReactI18next).init({
   resources,
   lng: savedLanguage,
+  // لغة الطوارئ. إذا نسي المبرمج ترجمة كلمة معينة في اللغة الهندية أو العربية، سيعرض التطبيق الكلمة باللغة الإنجليزية بدلاً من إظهار خطأ أو فراغ.
   fallbackLng: 'en',
   ns: [
     'common',

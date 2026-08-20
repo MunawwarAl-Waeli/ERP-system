@@ -1,9 +1,10 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, useTheme, IconButton } from 'react-native-paper';
-import { CurrencyText } from '@shared/components/CurrencyText';
-import { paperIcon } from '@shared/components/Icon';
-import { CartItem } from '@core/types';
+// components/CartItemRow.tsx
+import React from "react";
+import { View, StyleSheet } from "react-native";
+import { Text, useTheme, IconButton } from "react-native-paper";
+import { CurrencyText } from "@shared/components/CurrencyText";
+import { paperIcon } from "@shared/components/Icon";
+import { CartItem } from "@core/types";
 
 interface CartItemRowProps {
   item: CartItem;
@@ -19,17 +20,34 @@ export const CartItemRow: React.FC<CartItemRowProps> = ({
   const theme = useTheme();
 
   return (
-    <View style={[styles.container, { borderBottomColor: theme.colors.outlineVariant }]}>
+    <View
+      style={[
+        styles.container,
+        { borderBottomColor: theme.colors.outlineVariant },
+      ]}
+    >
       <View style={styles.info}>
-        <Text variant="bodyLarge" numberOfLines={1} style={{ color: theme.colors.onSurface }}>
+        <Text
+          variant="bodyLarge"
+          numberOfLines={1}
+          style={{ color: theme.colors.onSurface }}
+        >
           {item.productName}
         </Text>
-        <CurrencyText amount={item.unitPrice} variant="bodySmall" />
+        <View style={styles.metaRow}>
+          <CurrencyText amount={item.unitPrice} variant="bodySmall" />
+          <Text
+            variant="bodySmall"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
+            {item.unitName}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.quantitySection}>
         <IconButton
-          icon={paperIcon('minus')}
+          icon={paperIcon("minus")}
           size={18}
           mode="contained-tonal"
           onPress={() => onUpdateQuantity(Math.max(0.5, item.quantity - 1))}
@@ -38,7 +56,7 @@ export const CartItemRow: React.FC<CartItemRowProps> = ({
           {item.quantity}
         </Text>
         <IconButton
-          icon={paperIcon('plus')}
+          icon={paperIcon("plus")}
           size={18}
           mode="contained-tonal"
           onPress={() => onUpdateQuantity(item.quantity + 1)}
@@ -48,7 +66,7 @@ export const CartItemRow: React.FC<CartItemRowProps> = ({
       <View style={styles.totalSection}>
         <CurrencyText amount={item.total} variant="titleSmall" />
         <IconButton
-          icon={paperIcon('close')}
+          icon={paperIcon("close")}
           size={16}
           onPress={onRemove}
           iconColor={theme.colors.error}
@@ -60,8 +78,8 @@ export const CartItemRow: React.FC<CartItemRowProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
@@ -70,17 +88,22 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   quantitySection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginHorizontal: 8,
   },
   quantity: {
     minWidth: 28,
-    textAlign: 'center',
+    textAlign: "center",
   },
   totalSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
 });

@@ -1,26 +1,33 @@
-import React, { useEffect } from 'react';
-import { StatusBar } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { PaperProvider } from 'react-native-paper';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
-import { I18nextProvider } from 'react-i18next';
-import RNBootSplash from 'react-native-bootsplash';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import React, { useEffect } from "react";
+import { StatusBar } from "react-native";
+import { NavigationContainer } from "@react-navigation/native";
+import { PaperProvider } from "react-native-paper";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { DatabaseProvider } from "@nozbe/watermelondb/DatabaseProvider";
+import { I18nextProvider } from "react-i18next";
+import RNBootSplash from "react-native-bootsplash";
 
-import i18n from '@core/i18n';
-import { database } from '@core/database';
-import { CombinedLightTheme, CombinedDarkTheme } from '@core/theme';
-import { useSettingsStore } from '@features/settings/store/useSettingsStore';
-import { useSyncStore } from '@features/settings/store/useSyncStore';
-import { useAutoSync } from '@shared/hooks/useAutoSync';
-import { RootNavigator } from './navigation/RootNavigator';
-import { AppIcon } from '@shared/components/Icon';
+import i18n from "@core/i18n";
+import { database } from "@core/database";
+import { CombinedLightTheme, CombinedDarkTheme } from "@core/theme";
+import { useSettingsStore } from "@features/settings/store/useSettingsStore";
+import { useSyncStore } from "@features/settings/store/useSyncStore";
+import { useAutoSync } from "@shared/hooks/useAutoSync";
+import { RootNavigator } from "./navigation/RootNavigator";
+import { AppIcon } from "@shared/components/Icon";
 
 const paperSettings = {
-  icon: ({ name, size, color }: { name: string; size: number; color?: string }) => (
-    <AppIcon name={name} size={size} color={color} />
-  ),
+  icon: ({
+    name,
+    size,
+    color,
+  }: {
+    name: string;
+    size: number;
+    color?: string;
+  }) => <AppIcon name={name} size={size} color={color} />,
 };
 
 const App: React.FC = () => {
@@ -33,6 +40,8 @@ const App: React.FC = () => {
 
   // Auto-sync when database changes or app comes to foreground
   useAutoSync();
+
+
 
   // Use user preference, fallback to system
   const theme = isDarkMode ? CombinedDarkTheme : CombinedLightTheme;
@@ -52,7 +61,7 @@ const App: React.FC = () => {
                 onReady={() => RNBootSplash.hide({ fade: true })}
               >
                 <StatusBar
-                  barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+                  barStyle={isDarkMode ? "light-content" : "dark-content"}
                   backgroundColor={theme.colors.surface}
                 />
                 <RootNavigator />

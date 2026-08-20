@@ -1,3 +1,4 @@
+/* eslint-disable no-nested-ternary */
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text, useTheme, Surface, Chip, Divider } from 'react-native-paper';

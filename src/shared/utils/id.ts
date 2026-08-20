@@ -1,4 +1,3 @@
-import { BILL_NUMBER_PREFIX } from '@core/constants';
 import {
     incrementBillSequence,
     getLastBillDate,
@@ -7,25 +6,17 @@ import {
 } from '@core/storage/mmkv';
 import { formatDateForBill } from './date';
 
-export const generateBillNumber = (): string => {
+export const generateNumber = (prefix: string): string => {
     const today = formatDateForBill();
-    const lastDate = getLastBillDate();
+    const lastDate = getLastBillDate(prefix);
 
     if (lastDate !== today) {
-        resetBillSequence();
-        setLastBillDate(today);
+        resetBillSequence(prefix);
+        setLastBillDate(prefix, today);
     }
 
-    const seq = incrementBillSequence();
+    const seq = incrementBillSequence(prefix);
     const seqStr = seq.toString().padStart(4, '0');
 
-    return `${BILL_NUMBER_PREFIX}-${today}-${seqStr}`;
-};
-
-let counter = 0;
-export const generateId = (): string => {
-    counter += 1;
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 8);
-    return `${timestamp}-${random}-${counter}`;
+    return `${prefix}-${today}-${seqStr}`;
 };

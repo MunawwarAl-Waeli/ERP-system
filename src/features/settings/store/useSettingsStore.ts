@@ -1,7 +1,9 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { zustandMMKVStorage } from '@core/storage/zustandStorage';
-import { StoreProfile } from '@core/types';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { zustandMMKVStorage } from "@core/storage/zustandStorage";
+import { StoreProfile } from "@core/types";
+import { I18nManager } from "react-native";
+import i18n from "@core/i18n";
 
 interface SettingsState {
   language: string;
@@ -14,20 +16,29 @@ interface SettingsState {
 }
 
 const DEFAULT_STORE_PROFILE: StoreProfile = {
-  name: '',
-  address: '',
-  phone: '',
-  gstNumber: '',
+  name: "",
+  address: "",
+  phone: "",
+  gstNumber: "",
 };
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      language: 'en',
+      language: "en",
       isDarkMode: false,
       storeProfile: DEFAULT_STORE_PROFILE,
 
-      setLanguage: (lang: string) => set({ language: lang }),
+      setLanguage: (lang: string) => {
+        const isRTL = lang === "ar";
+        // if (isRTL) {
+          I18nManager.allowRTL(isRTL);
+          I18nManager.forceRTL(isRTL);
+        // }
+        i18n.changeLanguage(lang);
+
+        set({ language: lang });
+      },
 
       setDarkMode: (isDark: boolean) => set({ isDarkMode: isDark }),
 
@@ -38,13 +49,13 @@ export const useSettingsStore = create<SettingsState>()(
 
       resetSettings: () =>
         set({
-          language: 'en',
+          language: "en",
           isDarkMode: false,
           storeProfile: DEFAULT_STORE_PROFILE,
         }),
     }),
     {
-      name: 'settings-store',
+      name: "settings-store",
       storage: createJSONStorage(() => zustandMMKVStorage),
     },
   ),

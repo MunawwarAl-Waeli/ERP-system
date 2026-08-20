@@ -1,49 +1,52 @@
-import { z } from 'zod';
+import z from "zod";
 
-export const productSchema = z.object({
-  name: z
-    .string()
-    .min(2, 'Name must be at least 2 characters')
-    .max(100, 'Name must be less than 100 characters'),
-  categoryId: z.string().optional().or(z.literal('')),
+// وحدة المنتج
+export const productUnitSchema = z.object({
+  unitId: z.string().min(1, { message: "الوحدة مطلوبة" }),
+  barcode: z.string().optional(),
+  conversionFactor: z
+    .number()
+    .positive({ message: "عامل التحويل يجب أن يكون أكبر من 0" }),
+  salePrice: z.number().min(0, { message: "سعر البيع لا يمكن أن يكون سالباً" }),
   purchasePrice: z
     .number()
-    .min(0, 'Purchase price must be 0 or more')
-    .default(0),
-  sellingPrice: z
-    .number()
-    .min(0.01, 'Selling price is required')
-    .default(0),
-  currentStock: z
-    .number()
-    .min(0, 'Stock cannot be negative')
-    .default(0),
-  lowStockThreshold: z
-    .number()
-    .min(0, 'Threshold cannot be negative')
-    .default(5),
-  unit: z.string().default('pcs'),
-  barcode: z.string().optional().or(z.literal('')),
+    .min(0, { message: "سعر الشراء لا يمكن أن يكون سالباً" }),
 });
+
+export type ProductUnitForm = z.infer<typeof productUnitSchema>;
+
+// المنتج الأساسي
+export const productSchema = z.object({
+  name: z.string().min(1, { message: "اسم المنتج مطلوب" }),
+  sku: z.string().optional(),
+  categoryId: z.string().optional(),
+  minStock: z
+    .number()
+    .min(0, { message: "الحد الأدنى للمخزون يجب أن يكون 0 أو أكثر" }),
+  isActive: z.boolean().default(true),
+  units: z
+    .array(productUnitSchema)
+    .min(1, { message: "يجب إضافة وحدة واحدة على الأقل" }),
+});
+
+export type ProductForm = z.infer<typeof productSchema>;
 
 export type ProductFormData = z.infer<typeof productSchema>;
 
 export const categorySchema = z.object({
   name: z
     .string()
-    .min(2, 'Name must be at least 2 characters')
-    .max(50, 'Name must be less than 50 characters'),
-  icon: z.string().default('tag'),
+    .min(2, "Name must be at least 2 characters")
+    .max(50, "Name must be less than 50 characters"),
+  icon: z.string().default("tag"),
 });
 
 export type CategoryFormData = z.infer<typeof categorySchema>;
 
 export const stockAdjustmentSchema = z.object({
-  quantity: z
-    .number()
-    .min(1, 'Quantity must be at least 1'),
-  reason: z.string().min(1, 'Reason is required'),
-  notes: z.string().optional().or(z.literal('')),
+  quantity: z.number().min(1, "Quantity must be at least 1"),
+  reason: z.string().min(1, "Reason is required"),
+  notes: z.string().optional().or(z.literal("")),
 });
 
 export type StockAdjustmentFormData = z.infer<typeof stockAdjustmentSchema>;

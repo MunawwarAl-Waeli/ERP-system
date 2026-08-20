@@ -1,27 +1,15 @@
-import { generatePDF } from 'react-native-html-to-pdf';
-import ReactNativeBlobUtil from 'react-native-blob-util';
-import { Platform } from 'react-native';
-import { formatDateTime, formatDate } from '@shared/utils/date';
-import { CURRENCY_SYMBOL } from '@core/constants';
+// services/salesInvoicePdfService.ts
+import { generatePDF } from "react-native-html-to-pdf";
+import ReactNativeBlobUtil from "react-native-blob-util";
+import { Platform } from "react-native";
+import { formatDateTime, formatDate } from "@shared/utils/date";
+import { CURRENCY_SYMBOL } from "@core/constants";
 
-export interface BillPdfData {
-  storeName: string;
-  storeAddress: string;
-  storePhone: string;
-  gstNumber?: string;
-  billNumber: string;
-  createdAt: Date;
-  items: BillPdfItem[];
-  subtotal: number;
-  discountTotal: number;
-  grandTotal: number;
-  paymentMode: string;
-  customerName?: string;
-  customerPhone?: string;
-  status: string;
-}
+// ========================================
+// 1. الأنواع (Types)
+// ========================================
 
-export interface BillPdfItem {
+export interface SalesInvoicePdfItem {
   productName: string;
   quantity: number;
   unit?: string;
@@ -29,33 +17,73 @@ export interface BillPdfItem {
   total: number;
 }
 
-const formatCurrency = (amount: number): string => {
-  return `${CURRENCY_SYMBOL}${amount.toFixed(2)}`;
-};
+export interface SalesInvoicePdfData {
+  storeName: string;
+  storeAddress: string;
+  storePhone: string;
+  gstNumber?: string;
+  invoiceNumber: string;
+  invoiceDate: Date | number;
+  items: SalesInvoicePdfItem[];
+  subtotal: number;
+  discountTotal: number;
+  grandTotal: number;
+  paymentType: "cash" | "credit" | "partial";
+  customerName?: string;
+  customerPhone?: string;
+  status: "draft" | "approved" | "cancelled" | "paid" | "partial";
+}
 
-const generateBillHtml = (data: BillPdfData): string => {
+// ========================================
+// 2. دالة تنسيق العملة
+// ========================================
+
+const formatCurrency = (amount: number): string =>
+  `${CURRENCY_SYMBOL}${amount.toFixed(2)}`;
+
+// ========================================
+// 3. دالة إنشاء HTML للفاتورة
+// ========================================
+
+const generateInvoiceHtml = (data: SalesInvoicePdfData): string => {
+  // 3.1 بناء صفوف البنود
   const itemsHtml = data.items
     .map(
       (item, index) => `
-      <tr class="${index % 2 === 1 ? 'row-alt' : ''}">
+      <tr class="${index % 2 === 1 ? "row-alt" : ""}">
         <td class="cell cell-center">${index + 1}</td>
         <td class="cell">${item.productName}</td>
-        <td class="cell cell-center">${item.quantity}${item.unit ? ` ${item.unit}` : ''}</td>
+        <td class="cell cell-center">${item.quantity}${
+        item.unit ? ` ${item.unit}` : ""
+      }</td>
         <td class="cell cell-right">${formatCurrency(item.unitPrice)}</td>
         <td class="cell cell-right cell-bold">${formatCurrency(item.total)}</td>
       </tr>`,
     )
-    .join('');
+    .join("");
 
-  const isCancelled = data.status === 'cancelled';
+  // 3.2 تحديد حالة الفاتورة
+  const isCancelled = data.status === "cancelled";
+  const isDraft = data.status === "draft";
 
+  // 3.3 ألوان طريقة الدفع
   const paymentColors: Record<string, string> = {
-    cash: '#2e7d32',
-    upi: '#1565c0',
-    card: '#6a1b9a',
-    credit: '#e65100',
+    cash: "#2e7d32",
+    credit: "#e65100",
+    partial: "#1565c0",
   };
-  const paymentColor = paymentColors[data.paymentMode] || '#2e7d32';
+  const paymentColor = paymentColors[data.paymentType] || "#2e7d32";
+
+  // 3.4 حالة الفاتورة (للـ CSS)
+  const statusClass = isCancelled
+    ? "status-cancelled"
+    : isDraft
+    ? "status-draft"
+    : "status-completed";
+
+  // ========================================
+  // 4. قالب HTML الكامل
+  // ========================================
 
   return `<!DOCTYPE html>
 <html>
@@ -124,6 +152,7 @@ const generateBillHtml = (data: BillPdfData): string => {
       letter-spacing: 0.5px;
     }
     .status-completed { background: #e8f5e9; color: #2e7d32; }
+    .status-draft { background: #fff3e0; color: #e65100; }
     .status-cancelled { background: #ffebee; color: #c62828; }
 
     /* Bill meta */
@@ -234,7 +263,11 @@ const generateBillHtml = (data: BillPdfData): string => {
       font-weight: 800;
       color: #2e7d32;
     }
-    ${isCancelled ? '.grand-total-value { color: #c62828; text-decoration: line-through; }' : ''}
+    ${
+      isCancelled
+        ? ".grand-total-value { color: #c62828; text-decoration: line-through; }"
+        : ""
+    }
     .payment-pill {
       display: inline-block;
       background: ${paymentColor}15;
@@ -267,45 +300,59 @@ const generateBillHtml = (data: BillPdfData): string => {
   <div class="invoice">
     <!-- Store Header -->
     <div class="header">
-      <div class="store-name">${data.storeName || 'Store Name'}</div>
+      <div class="store-name">${data.storeName || "Store Name"}</div>
       <div class="store-detail">
-        ${data.storeAddress ? `${data.storeAddress}<br>` : ''}
-        ${data.storePhone ? `Ph: ${data.storePhone}` : ''}
+        ${data.storeAddress ? `${data.storeAddress}<br>` : ""}
+        ${data.storePhone ? `Ph: ${data.storePhone}` : ""}
       </div>
-      ${data.gstNumber ? `<div class="gst-badge">GSTIN: ${data.gstNumber}</div>` : ''}
+      ${
+        data.gstNumber
+          ? `<div class="gst-badge">GSTIN: ${data.gstNumber}</div>`
+          : ""
+      }
     </div>
 
     <!-- Invoice Title & Status -->
     <div class="invoice-title">
       <span class="invoice-label">Invoice</span>
-      <span class="status ${isCancelled ? 'status-cancelled' : 'status-completed'}">${data.status}</span>
+      <span class="status ${statusClass}">${data.status}</span>
     </div>
 
     <!-- Meta Grid -->
     <div class="meta-grid">
       <div class="meta-box">
-        <div class="meta-label">Bill Number</div>
-        <div class="meta-value">#${data.billNumber}</div>
+        <div class="meta-label">Invoice Number</div>
+        <div class="meta-value">#${data.invoiceNumber}</div>
       </div>
       <div class="meta-box">
         <div class="meta-label">Date</div>
-        <div class="meta-value">${formatDateTime(data.createdAt)}</div>
+        <div class="meta-value">${formatDateTime(data.invoiceDate)}</div>
       </div>
       <div class="meta-box payment">
         <div class="meta-label">Payment</div>
-        <div class="meta-value">${data.paymentMode.toUpperCase()}</div>
+        <div class="meta-value">${data.paymentType.toUpperCase()}</div>
       </div>
     </div>
 
-    ${data.customerName ? `
+    ${
+      data.customerName
+        ? `
     <!-- Customer -->
     <div class="customer-card">
-      <div class="customer-avatar">${data.customerName.charAt(0).toUpperCase()}</div>
+      <div class="customer-avatar">${data.customerName
+        .charAt(0)
+        .toUpperCase()}</div>
       <div>
         <div class="customer-name">${data.customerName}</div>
-        ${data.customerPhone ? `<div class="customer-phone">Ph: ${data.customerPhone}</div>` : ''}
+        ${
+          data.customerPhone
+            ? `<div class="customer-phone">Ph: ${data.customerPhone}</div>`
+            : ""
+        }
       </div>
-    </div>` : ''}
+    </div>`
+        : ""
+    }
 
     <!-- Items Table -->
     <table class="items-table">
@@ -324,21 +371,29 @@ const generateBillHtml = (data: BillPdfData): string => {
     <!-- Summary -->
     <div class="summary">
       <div class="summary-row">
-        <span>Subtotal (${data.items.length} ${data.items.length === 1 ? 'item' : 'items'})</span>
+        <span>Subtotal (${data.items.length} ${
+    data.items.length === 1 ? "item" : "items"
+  })</span>
         <span>${formatCurrency(data.subtotal)}</span>
       </div>
-      ${data.discountTotal > 0 ? `
+      ${
+        data.discountTotal > 0
+          ? `
       <div class="summary-row discount-row">
         <span>Discount</span>
         <span>-${formatCurrency(data.discountTotal)}</span>
-      </div>` : ''}
+      </div>`
+          : ""
+      }
       <hr class="total-divider">
       <div class="grand-total">
         <span class="grand-total-label">Grand Total</span>
-        <span class="grand-total-value">${formatCurrency(data.grandTotal)}</span>
+        <span class="grand-total-value">${formatCurrency(
+          data.grandTotal,
+        )}</span>
       </div>
       <div style="text-align: center;">
-        <span class="payment-pill">${data.paymentMode.toUpperCase()}</span>
+        <span class="payment-pill">${data.paymentType.toUpperCase()}</span>
       </div>
     </div>
 
@@ -352,73 +407,88 @@ const generateBillHtml = (data: BillPdfData): string => {
 </html>`;
 };
 
-export const billPdfService = {
+// ========================================
+// 5. خدمة PDF للمبيعات
+// ========================================
+
+export const salesInvoicePdfService = {
   /**
-   * Generate PDF file from bill data
+   * Generate PDF file from invoice data
    * @returns Path to the generated PDF file
    */
-  async generatePdf(data: BillPdfData): Promise<string> {
-    const html = generateBillHtml(data);
+  async generatePdf(data: SalesInvoicePdfData): Promise<string> {
+    const html = generateInvoiceHtml(data);
 
     const pdf = await generatePDF({
       html,
-      fileName: `Bill_${data.billNumber}`,
-      directory: 'Documents',
+      fileName: `Invoice_${data.invoiceNumber}`,
+      directory: "Documents",
       width: 400,
       height: 600,
       padding: 0,
     });
     if (!pdf.filePath) {
-      throw new Error('Failed to generate PDF');
+      throw new Error("Failed to generate PDF");
     }
 
     return pdf.filePath;
   },
 
   /**
-   * Generate plain text bill for sharing as fallback
+   * Generate plain text invoice for sharing as fallback
    */
-  generateTextBill(data: BillPdfData): string {
+  generateTextInvoice(data: SalesInvoicePdfData): string {
     const lines: string[] = [];
     lines.push(data.storeName);
-    if (data.storeAddress) lines.push(data.storeAddress);
-    if (data.storePhone) lines.push(`Ph: ${data.storePhone}`);
-    if (data.gstNumber) lines.push(`GST: ${data.gstNumber}`);
-    lines.push('─'.repeat(30));
-    lines.push(`Bill: #${data.billNumber}`);
-    lines.push(`Date: ${formatDateTime(data.createdAt)}`);
-    lines.push(`Payment: ${data.paymentMode.toUpperCase()}`);
-    if (data.customerName) lines.push(`Customer: ${data.customerName}`);
-    lines.push('─'.repeat(30));
+    if (data.storeAddress) {
+      lines.push(data.storeAddress);
+    }
+    if (data.storePhone) {
+      lines.push(`Ph: ${data.storePhone}`);
+    }
+    if (data.gstNumber) {
+      lines.push(`GST: ${data.gstNumber}`);
+    }
+    lines.push("─".repeat(30));
+    lines.push(`Invoice: #${data.invoiceNumber}`);
+    lines.push(`Date: ${formatDateTime(data.invoiceDate)}`);
+    lines.push(`Payment: ${data.paymentType.toUpperCase()}`);
+    if (data.customerName) {
+      lines.push(`Customer: ${data.customerName}`);
+    }
+    lines.push("─".repeat(30));
 
     data.items.forEach((item, i) => {
       lines.push(`${i + 1}. ${item.productName}`);
-      lines.push(`   ${item.quantity} × ${formatCurrency(item.unitPrice)} = ${formatCurrency(item.total)}`);
+      lines.push(
+        `   ${item.quantity} × ${formatCurrency(
+          item.unitPrice,
+        )} = ${formatCurrency(item.total)}`,
+      );
     });
 
-    lines.push('─'.repeat(30));
+    lines.push("─".repeat(30));
     lines.push(`Subtotal: ${formatCurrency(data.subtotal)}`);
     if (data.discountTotal > 0) {
       lines.push(`Discount: -${formatCurrency(data.discountTotal)}`);
     }
     lines.push(`Grand Total: ${formatCurrency(data.grandTotal)}`);
-    lines.push('─'.repeat(30));
-    lines.push('Thank you for your purchase!');
+    lines.push("─".repeat(30));
+    lines.push("Thank you for your purchase!");
 
-    return lines.join('\n');
+    return lines.join("\n");
   },
 
   /**
-   * Generate PDF and open it in the device's native PDF viewer.
-   * The user can then share from the viewer app itself.
+   * Generate PDF and open it in the device's native PDF viewer
    */
-  async sharePdf(data: BillPdfData): Promise<void> {
+  async sharePdf(data: SalesInvoicePdfData): Promise<void> {
     const filePath = await this.generatePdf(data);
 
-    if (Platform.OS === 'android') {
+    if (Platform.OS === "android") {
       await ReactNativeBlobUtil.android.actionViewIntent(
         filePath,
-        'application/pdf',
+        "application/pdf",
       );
     } else {
       await ReactNativeBlobUtil.ios.openDocument(filePath);
@@ -428,7 +498,7 @@ export const billPdfService = {
   /**
    * Generate PDF and return path for preview
    */
-  async getPdfForPreview(data: BillPdfData): Promise<string> {
-    return await this.generatePdf(data);
+  getPdfForPreview(data: SalesInvoicePdfData): Promise<string> {
+    return this.generatePdf(data);
   },
 };

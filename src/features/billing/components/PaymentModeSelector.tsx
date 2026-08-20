@@ -1,14 +1,16 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { SegmentedButtons } from 'react-native-paper';
-import { useTranslation } from 'react-i18next';
-import { paperIcon } from '@shared/components/Icon';
-import { PAYMENT_MODES } from '@core/constants';
+// components/PaymentModeSelector.tsx
+import React from "react";
+import { View, StyleSheet } from "react-native";
+import { SegmentedButtons } from "react-native-paper";
+import { useTranslation } from "react-i18next";
+import { paperIcon } from "@shared/components/Icon";
+
+type PaymentType = "cash" | "credit" | "partial";
 
 interface PaymentModeSelectorProps {
-  value: string;
-  onChange: (mode: 'cash' | 'upi' | 'card' | 'credit') => void;
-  showCredit?: boolean;
+  value: PaymentType;
+  onChange: (mode: PaymentType) => void;
+  showCredit?: boolean; // يتحكم في ظهور خيارات الائتمان (credit و partial)
 }
 
 export const PaymentModeSelector: React.FC<PaymentModeSelectorProps> = ({
@@ -16,22 +18,38 @@ export const PaymentModeSelector: React.FC<PaymentModeSelectorProps> = ({
   onChange,
   showCredit = true,
 }) => {
-  const { t } = useTranslation('billing');
+  const { t } = useTranslation("billing");
 
+  // الأزرار الأساسية (نقدي)
   const buttons = [
-    { value: PAYMENT_MODES.CASH, label: t('cash'), icon: paperIcon('cash') },
-    { value: PAYMENT_MODES.UPI, label: t('upi'), icon: paperIcon('cellphone') },
-    { value: PAYMENT_MODES.CARD, label: t('card'), icon: paperIcon('credit-card') },
-    ...(showCredit
-      ? [{ value: PAYMENT_MODES.CREDIT, label: t('credit'), icon: paperIcon('account-clock') }]
-      : []),
+    {
+      value: "cash",
+      label: t("cash"),
+      icon: paperIcon("cash"),
+    },
   ];
+
+  // إضافة خيارات الائتمان إذا كان مسموحاً
+  if (showCredit) {
+    buttons.push(
+      {
+        value: "credit",
+        label: t("credit"),
+        icon: paperIcon("account-clock"),
+      },
+      {
+        value: "partial",
+        label: t("partial"),
+        icon: paperIcon("percent"),
+      },
+    );
+  }
 
   return (
     <View style={styles.container}>
       <SegmentedButtons
         value={value}
-        onValueChange={(val) => onChange(val as 'cash' | 'upi' | 'card' | 'credit')}
+        onValueChange={(val) => onChange(val as PaymentType)}
         buttons={buttons}
       />
     </View>

@@ -1,8 +1,8 @@
 // ── Payment Modes ──
 export const PAYMENT_MODES = {
   CASH: 'cash',
-  UPI: 'upi',
-  CARD: 'card',
+  UPI: 'upi', // مشترك جزئي
+  CARD: 'card',// بطاقة بنكيه
   CREDIT: 'credit',
   MIXED: 'mixed',
 } as const;
@@ -47,7 +47,7 @@ export const UNIT_OPTIONS: { value: ProductUnit; labelKey: string }[] = [
   { value: 'dozen', labelKey: 'products:units.dozen' },
 ];
 
-// ── Credit Entry Types ──
+// ── Credit Entry Types ── دفتر الديون والائتمان
 export const CREDIT_ENTRY_TYPES = {
   CREDIT: 'credit',
   PAYMENT: 'payment',
@@ -71,9 +71,10 @@ export const LANGUAGES = [
   { code: 'en', label: 'English', nativeLabel: 'English' },
   { code: 'hi', label: 'Hindi', nativeLabel: 'हिन्दी' },
   { code: 'gu', label: 'Gujarati', nativeLabel: 'ગુજરાતી' },
+  { code: 'ar', label: 'العربيه', nativeLabel: 'العربيه' },
 ] as const;
 
-export type LanguageCode = 'en' | 'hi' | 'gu';
+export type LanguageCode ='ar'|'en' | 'hi' | 'gu';
 
 // ── Defaults ──
 export const DEFAULT_LOW_STOCK_THRESHOLD = 10;
@@ -81,5 +82,5 @@ export const PIN_LENGTH = 4;
 export const BILL_NUMBER_PREFIX = 'KM';
 export const DATE_FORMAT = 'DD/MM/YYYY';
 export const DATE_TIME_FORMAT = 'DD/MM/YYYY hh:mm A';
-export const CURRENCY_SYMBOL = '₹';
+export const CURRENCY_SYMBOL = 'ر.ي';
 export const APP_VERSION = '1.0.0';
