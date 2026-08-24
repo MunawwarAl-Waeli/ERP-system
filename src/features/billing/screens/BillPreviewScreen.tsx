@@ -572,7 +572,7 @@ export const SalesInvoiceDetailScreen: React.FC<
         </Button>
         <Button
           mode="contained"
-          onPress={() => navigation.navigate("BillingScreen")}
+          onPress={() => navigation.navigate("BillingHome")}
           icon={paperIcon("plus")}
           style={styles.newBillButton}
           contentStyle={styles.buttonContent}

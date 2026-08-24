@@ -27,6 +27,32 @@ export const MoreMenuScreen: React.FC<{ navigation: NavigationProp }> = ({
       <AppHeader title={t("common:more")} />
       <ScrollView>
         <List.Item
+          title="إدارة الموردين"
+          description="عرض الموردين وكشوفات الحسابات"
+          left={(props) => (
+            <List.Icon {...props} icon={paperIcon("truck-delivery")} />
+          )}
+          right={(props) => (
+            <List.Icon {...props} icon={paperIcon("chevron-right")} />
+          )}
+          onPress={() => navigation.navigate("SupplierList")}
+        />
+        <Divider />
+
+        <List.Item
+          title="فاتورة مشتريات جديدة"
+          description="تسجيل مشتريات جديدة وتغذية المخزون"
+          left={(props) => (
+            <List.Icon {...props} icon={paperIcon("cart-plus")} />
+          )}
+          right={(props) => (
+            <List.Icon {...props} icon={paperIcon("chevron-right")} />
+          )}
+          onPress={() => navigation.navigate("PurchaseForm")}
+        />
+        <Divider />
+
+        <List.Item
           title={t("common:reports")}
           description={t("common:viewReports")}
           left={(props) => (
@@ -75,6 +101,45 @@ export const MoreMenuScreen: React.FC<{ navigation: NavigationProp }> = ({
             <List.Icon {...props} icon={paperIcon("chevron-right")} />
           )}
           onPress={() => navigation.navigate("AccountingSettings")}
+        />
+        <Divider />
+
+        <List.Item
+          title="إدارة التصنيفات"
+          description="إضافة وتعديل وحذف تصنيفات المنتجات"
+          left={(props) => (
+            <List.Icon {...props} icon={paperIcon("folder-outline")} />
+          )}
+          right={(props) => (
+            <List.Icon {...props} icon={paperIcon("chevron-right")} />
+          )}
+          onPress={() => navigation.navigate("CategoryManagement")}
+        />
+        <Divider />
+
+        <List.Item
+          title="إدارة وحدات القياس"
+          description="إدارة وحدات البيع والشراء (قطعة، كرتون، إلخ)"
+          left={(props) => (
+            <List.Icon {...props} icon={paperIcon("scale-balance")} />
+          )}
+          right={(props) => (
+            <List.Icon {...props} icon={paperIcon("chevron-right")} />
+          )}
+          onPress={() => navigation.navigate("UnitManagement")}
+        />
+        <Divider />
+
+        <List.Item
+          title="فحص وتأكيد النظام"
+          description="التشخيص المحاسبي والبرمجي للبيانات"
+          left={(props) => (
+            <List.Icon {...props} icon={paperIcon("shield-check-outline")} />
+          )}
+          right={(props) => (
+            <List.Icon {...props} icon={paperIcon("chevron-right")} />
+          )}
+          onPress={() => navigation.navigate("SystemDiagnostic")}
         />
         <Divider />
 

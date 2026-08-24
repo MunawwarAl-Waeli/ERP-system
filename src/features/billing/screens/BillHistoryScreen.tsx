@@ -155,12 +155,12 @@ export const SalesInvoiceHistoryScreen: React.FC<
             data={invoices}
             renderItem={({ item }: { item: SalesInvoice }) => (
               <SalesInvoiceCard
-                invoiceNumber={item.id || `#${item.id.slice(0, 8)}`}
+                invoiceNumber={item.invoiceNumber || `#${item.id.slice(0, 8)}`}
                 total={item.total}
                 paymentType={item.paymentType}
                 status={item.status}
                 invoiceDate={item.invoiceDate}
-                customerName={item.customer?.name}
+                customerName={item.customerName || t("walkInCustomer")}
                 onPress={() =>
                   navigation.navigate("SalesInvoiceDetail", {
                     invoiceId: item.id,

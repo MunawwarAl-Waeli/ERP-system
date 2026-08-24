@@ -15,6 +15,20 @@ export type CustomerStackParamList = {
   CustomerList: { selectionMode?: boolean } | undefined;
   CustomerDetail: { customerId: string };
   CustomerForm: { customerId?: string } | undefined;
+  CustomerLedger: { customerId: string };
+};
+
+// ── Supplier Stack ──
+export type SupplierStackParamList = {
+  SupplierList: undefined;
+  SupplierDetail: { supplierId: string };
+  SupplierForm: { supplierId?: string } | undefined;
+  SupplierLedger: { supplierId: string };
+};
+
+// ── Purchase Stack ──
+export type PurchaseStackParamList = {
+  PurchaseForm: { purchaseId?: string } | undefined;
 };
 
 // ── Inventory Stack ──
@@ -33,6 +47,11 @@ export type BillingStackParamList = {
   SalesInvoiceList: undefined;
 };
 
+// ── Expense Stack ──
+export type ExpenseStackParamList = {
+  ExpenseList: undefined;
+};
+
 // ── More (Reports + Settings) Stack ──
 export type MoreStackParamList = {
   MoreMenu: undefined;
@@ -44,6 +63,10 @@ export type MoreStackParamList = {
   Settings: undefined;
   ChartOfAccounts: undefined;
   AccountingSettings: undefined;
+  ExpenseList: undefined;
+  SystemDiagnostic: undefined;
+  CategoryManagement: undefined;
+  UnitManagement: undefined;
 };
 
 // ── Main Tab Navigator ──
@@ -52,6 +75,8 @@ export type MainTabParamList = {
   CustomersTab: NavigatorScreenParams<CustomerStackParamList>;
   BillingTab: NavigatorScreenParams<BillingStackParamList>;
   InventoryTab: NavigatorScreenParams<InventoryStackParamList>;
+  SupplierTab: NavigatorScreenParams<SupplierStackParamList>;
+  PurchaseTab: NavigatorScreenParams<PurchaseStackParamList>;
   MoreTab: NavigatorScreenParams<MoreStackParamList>;
 };
 
@@ -85,6 +110,12 @@ export type CustomerScreenProps<T extends keyof CustomerStackParamList> =
 export type InventoryScreenProps<T extends keyof InventoryStackParamList> =
   CompositeScreenProps<
     NativeStackScreenProps<InventoryStackParamList, T>,
+    MainTabScreenProps<keyof MainTabParamList>
+  >;
+
+export type PurchaseScreenProps<T extends keyof PurchaseStackParamList> =
+  CompositeScreenProps<
+    NativeStackScreenProps<PurchaseStackParamList, T>,
     MainTabScreenProps<keyof MainTabParamList>
   >;
 

@@ -53,7 +53,7 @@ export const CustomerDetailScreen: React.FC<{ navigation: NavigationProp; route:
         }
 
         try {
-            await customerRepository.addCreditPayment(customerId, amount, paymentNotes);
+            // await customerRepository.addCreditPayment(customerId, amount, paymentNotes);
             setShowPaymentDialog(false);
             setPaymentAmount('');
             setPaymentNotes('');
@@ -150,6 +150,18 @@ export const CustomerDetailScreen: React.FC<{ navigation: NavigationProp; route:
                         </Button>
                     </Card.Content>
                 </Card>
+
+                {/* زر الانتقال لكشف الحساب المفصل والمالي */}
+                <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+                    <Button
+                        mode="outlined"
+                        icon={paperIcon('file-document-outline')}
+                        onPress={() => navigation.navigate('CustomerLedger', { customerId })}
+                        style={{ borderColor: theme.colors.primary }}
+                    >
+                        {t('viewDetailedLedger') || 'عرض كشف الحساب المالي المفصل'}
+                    </Button>
+                </View>
 
                 {/* Credit Ledger */}
                 <View style={styles.ledgerSection}>

@@ -31,10 +31,10 @@ export const useSettingsStore = create<SettingsState>()(
 
       setLanguage: (lang: string) => {
         const isRTL = lang === "ar";
-        // if (isRTL) {
+        if (isRTL) {
           I18nManager.allowRTL(isRTL);
           I18nManager.forceRTL(isRTL);
-        // }
+        }
         i18n.changeLanguage(lang);
 
         set({ language: lang });

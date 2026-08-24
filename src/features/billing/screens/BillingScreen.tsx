@@ -1,4 +1,3 @@
-// screens/BillingScreen.tsx
 import React, { useState } from "react";
 import { View, StyleSheet, ScrollView, Alert } from "react-native";
 import { useTheme, Button, TextInput } from "react-native-paper";
@@ -64,8 +63,8 @@ export const BillingScreen: React.FC<{ navigation: NavigationProp }> = ({
         customerId: selectedCustomerId || undefined,
         invoiceDate: new Date(),
         paymentType,
-        status: "draft", // 👈 إضافة حالة الفاتورة المطلوبة
-        paidAmount: paymentType === "cash" ? grandTotal : 0, // 👈 إضافة المبلغ المدفوع المطلوب
+        status: "draft",
+        paidAmount: paymentType === "cash" ? grandTotal : 0,
         items: cartItems.map((item) => ({
           productId: item.productId,
           productUnitId: item.productUnitId,
@@ -75,6 +74,7 @@ export const BillingScreen: React.FC<{ navigation: NavigationProp }> = ({
           itemType: "product",
         })),
         discountTotal: discountTotal ?? 0,
+        serviceFee: serviceFee ?? 0,
         notes: "",
       });
 
@@ -172,7 +172,7 @@ export const BillingScreen: React.FC<{ navigation: NavigationProp }> = ({
                 productName: product.name,
                 unitName: t("unit"),
                 quantity,
-                unitPrice: unitRecord?.salePrice || 0, // 👈 جلب السعر من جدول الوحدات
+                unitPrice: unitRecord?.salePrice || 0,
                 discount: 0,
               });
             }
@@ -215,13 +215,9 @@ export const BillingScreen: React.FC<{ navigation: NavigationProp }> = ({
             <TextInput
               label={t("serviceFee") || "أجور الخدمات"}
               value={serviceFee ? serviceFee.toString() : ""}
-              onChangeText={(text) => {
-                const numericValue = parseFloat(text) || 0;
-                setServiceFee(numericValue);
-              }}
+              onChangeText={(text) => setServiceFee(parseFloat(text) || 0)}
               keyboardType="numeric"
               mode="outlined"
-              dense
               style={styles.serviceFeeInput}
             />
           </View>

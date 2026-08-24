@@ -1,6 +1,12 @@
+/* eslint-disable complexity */
 /* eslint-disable require-await */
 /* eslint-disable arrow-body-style */
-import { database, PaymentAllocation, ReceiptVoucher, SalesInvoice } from "@core/database";
+import {
+  database,
+  PaymentAllocation,
+  ReceiptVoucher,
+  SalesInvoice,
+} from "@core/database";
 import Customer from "@core/database/models/Customer";
 import { Q } from "@nozbe/watermelondb";
 import { CustomerFormData } from "../schemas/customerSchema";
@@ -9,8 +15,22 @@ import { receiptVoucherRepository } from "@features/ReceiptVoucher/repositories/
 
 const customersCollection = database.get<Customer>("customers");
 const salesInvoicesCollection = database.get<SalesInvoice>("sales_invoices");
-const paymentAllocationsCollection = database.get<PaymentAllocation>("payment_allocations");
-const receiptVouchersCollection = database.get<ReceiptVoucher>("receipt_vouchers");
+const paymentAllocationsCollection = database.get<PaymentAllocation>(
+  "payment_allocations",
+);
+const receiptVouchersCollection =
+  database.get<ReceiptVoucher>("receipt_vouchers");
+
+export interface LedgerTransactionItem {
+  id: string;
+  date: Date;
+  referenceNumber: string;
+  type: "invoice" | "receipt";
+  description: string;
+  debit: number; // مدين (عليه - فواتير)
+  credit: number; // دائن (له - دفعات وسندات)
+  runningBalance: number; // الرصيد التراكمي
+}
 
 export const customerRepository = {
   observeAll: () =>
@@ -66,14 +86,13 @@ export const customerRepository = {
     );
   },
 
-  // --- الدوال المالية ---
+  // --- الدوال المالية والمحاسبية ---
 
   getOutstandingBalance: async (customerId: string): Promise<number> => {
-    // 1. الفواتير غير الملغاة
     const invoices = await salesInvoicesCollection
       .query(
         Q.where("customer_id", customerId),
-        Q.where("status", Q.notEq("cancelled")), // ✅ التصحيح
+        Q.where("status", Q.notEq("cancelled")),
       )
       .fetch();
 
@@ -85,7 +104,7 @@ export const customerRepository = {
 
       const allocations = await paymentAllocationsCollection
         .query(
-          Q.where("allocatable_type", "sales_invoice"), // ✅ موحد
+          Q.where("allocatable_type", "sales_invoice"),
           Q.where("allocatable_id", invoice.id),
         )
         .fetch();
@@ -95,31 +114,100 @@ export const customerRepository = {
     return totalInvoices - totalPaid;
   },
 
-  getInvoicesWithBalance: async (customerId: string) => {
+  /**
+   * جلب كشف الحساب التفصيلي للعميل مرتباً زمنياً مع حساب الرصيد التراكمي (Running Balance)
+   */
+  getDetailedLedger: async (
+    customerId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<LedgerTransactionItem[]> => {
+    // 1. جلب فواتير المبيعات غير الملغاة
+    const invoiceQuery = [
+      Q.where("customer_id", customerId),
+      Q.where("status", Q.notEq("cancelled")),
+    ];
     const invoices = await salesInvoicesCollection
+      .query(...invoiceQuery)
+      .fetch();
+
+    // 2. جلب سندات القبض المرتبطة بالعميل
+    const receipts = await receiptVouchersCollection
       .query(
-        Q.where("customer_id", customerId),
+        Q.where("reference_type", "customer"),
+        Q.where("reference_id", customerId),
         Q.where("status", Q.notEq("cancelled")),
-        Q.sortBy("invoice_date", Q.desc),
       )
       .fetch();
 
-    const result = [];
-    for (const invoice of invoices) {
-      const allocations = await paymentAllocationsCollection
-        .query(
-          Q.where("allocatable_type", "sales_invoice"),
-          Q.where("allocatable_id", invoice.id),
-        )
-        .fetch();
-      const paid = allocations.reduce((sum, alloc) => sum + alloc.amount, 0);
-      result.push({
-        ...invoice,
-        paid,
-        remaining: invoice.total - paid,
+    // 3. توحيد الحركات في قائمة واحدة
+    const rawTransactions: {
+      id: string;
+      date: Date;
+      referenceNumber: string;
+      type: "invoice" | "receipt";
+      description: string;
+      debit: number;
+      credit: number;
+    }[] = [];
+
+    for (const inv of invoices) {
+      rawTransactions.push({
+        id: inv.id,
+        date: inv.invoiceDate || inv.createdAt,
+        referenceNumber: inv.invoiceNumber || inv.id,
+        type: "invoice",
+        description: `فاتورة مبيعات رقم ${inv.invoiceNumber || inv.id}`,
+        debit: inv.total || 0,
+        credit: 0,
       });
     }
-    return result;
+
+    for (const rec of receipts) {
+      rawTransactions.push({
+        id: rec.id,
+        date: rec.voucherDate || rec.createdAt,
+        referenceNumber: rec.voucherNumber || rec.id,
+        type: "receipt",
+        description:
+          rec.description || `سند قبض رقم ${rec.voucherNumber || rec.id}`,
+        debit: 0,
+        credit: rec.amount || 0,
+      });
+    }
+
+    // 4. الترتيب الزمني التصاعدي لحساب الرصيد التراكمي بشكل صحيح
+    rawTransactions.sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+
+    let runningBalance = 0;
+    const ledgerWithBalance: LedgerTransactionItem[] = rawTransactions.map(
+      (tx) => {
+        // الرصيد التراكمي = الرصيد السابق + المدين (عليه) - الدائن (له)
+        runningBalance = runningBalance + tx.debit - tx.credit;
+        return {
+          ...tx,
+          runningBalance,
+        };
+      },
+    );
+
+    // 5. تطبيق فلتر التاريخ إن وجد
+    let filtered = ledgerWithBalance;
+    if (startDate) {
+      filtered = filtered.filter((tx) => new Date(tx.date) >= startDate);
+    }
+    if (endDate) {
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      filtered = filtered.filter((tx) => new Date(tx.date) <= endOfDay);
+    }
+
+    // 6. إعادة الترتيب تنازلياً للعرض (الأحدث أولاً) مع الحفاظ على سلامة الرصيد التراكمي
+    return filtered.sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
   },
 
   addCustomerPayment: async (
@@ -134,10 +222,10 @@ export const customerRepository = {
     return receiptVoucherRepository.createAndAllocateToCustomer({
       voucherNumber: generateNumber("REC"),
       voucherDate: new Date(),
-      paymentAccountId: "jgjh",
+      paymentAccountId: "cash_account", // استخدام معرف افتراضي للصندوق
       customerId,
       amount,
-      description: notes || "دفعه من عميل ",
+      description: notes || "دفعة من عميل",
       createdBy,
     });
   },

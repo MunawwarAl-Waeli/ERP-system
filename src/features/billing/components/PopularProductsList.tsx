@@ -1,4 +1,3 @@
-// components/PopularProductsList.tsx
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -11,6 +10,7 @@ import { Text, useTheme, Button, Divider, Badge } from "react-native-paper";
 import { useTranslation } from "react-i18next";
 import { AppIcon, paperIcon } from "@shared/components/Icon";
 import { CurrencyText } from "@shared/components/CurrencyText";
+import { EmptyState } from "@shared/components/EmptyState";
 import { database } from "@core/database";
 import Product from "@core/database/models/Product";
 import ProductUnit from "@core/database/models/ProductUnit";
@@ -18,7 +18,6 @@ import { Q } from "@nozbe/watermelondb";
 import { inventoryRepository } from "@features/inventory/repositories/inventoryRepository";
 import { salesRepository } from "../repositories/salesRepository";
 
-// نوع ممتد يشمل الوحدات والرصيد
 interface ProductWithDetails extends Product {
   units: ProductUnit[];
   stock: number;
@@ -54,7 +53,6 @@ export const PopularProductsList: React.FC<PopularProductsListProps> = ({
   );
   const [isLoading, setIsLoading] = useState(true);
 
-  // ========== جلب المنتجات مع الوحدات والرصيد ==========
   const fetchProductsWithDetails = useCallback(
     async (productIds?: string[]): Promise<ProductWithDetails[]> => {
       const productsCollection = database.get<Product>("products");
@@ -93,23 +91,18 @@ export const PopularProductsList: React.FC<PopularProductsListProps> = ({
     [],
   );
 
-  // ========== تحميل المنتجات الأكثر مبيعاً ==========
   useEffect(() => {
     let cancelled = false;
 
     const loadPopularProducts = async () => {
       try {
-        // 1. جلب المنتجات الأكثر مبيعاً
         const popularIds = await salesRepository.getPopularProductIds(
           POPULAR_LIMIT,
         );
-
-        // 2. جلب جميع المنتجات النشطة
         const allProducts = await fetchProductsWithDetails();
 
-        if (cancelled) {return;}
+        if (cancelled) return;
 
-        // 3. ترتيب المنتجات: الأكثر مبيعاً أولاً، ثم الباقي
         const popularSet = new Set(popularIds);
         const popularList: ProductWithDetails[] = [];
         const remainingList: ProductWithDetails[] = [];
@@ -122,12 +115,10 @@ export const PopularProductsList: React.FC<PopularProductsListProps> = ({
           }
         }
 
-        // ترتيب الأكثر مبيعاً حسب الترتيب الأصلي
         const sortedPopular = popularIds
           .map((id) => allProducts.find((p) => p.id === id))
           .filter((p): p is ProductWithDetails => !!p);
 
-        // الباقي مرتب حسب الاسم
         const sortedRemaining = remainingList.sort((a, b) =>
           a.name.localeCompare(b.name),
         );
@@ -155,9 +146,8 @@ export const PopularProductsList: React.FC<PopularProductsListProps> = ({
     };
   }, [fetchProductsWithDetails]);
 
-  // ========== اختيار منتج ==========
   const toggleProduct = useCallback((product: ProductWithDetails) => {
-    if (product.isOutOfStock) {return;}
+    if (product.isOutOfStock) return;
 
     setSelectedItems((prev) => {
       const next = new Map(prev);
@@ -177,12 +167,11 @@ export const PopularProductsList: React.FC<PopularProductsListProps> = ({
     });
   }, []);
 
-  // ========== تحديث الكمية ==========
   const updateQuantity = useCallback((productId: string, delta: number) => {
     setSelectedItems((prev) => {
       const next = new Map(prev);
       const item = next.get(productId);
-      if (!item) {return prev;}
+      if (!item) return prev;
 
       const newQty = item.quantity + delta;
       if (newQty <= 0) {
@@ -194,7 +183,6 @@ export const PopularProductsList: React.FC<PopularProductsListProps> = ({
     });
   }, []);
 
-  // ========== إضافة الكل إلى السلة ==========
   const handleAddAll = useCallback(() => {
     const items = [...selectedItems.values()];
     if (items.length > 0) {
@@ -208,7 +196,6 @@ export const PopularProductsList: React.FC<PopularProductsListProps> = ({
     0,
   );
 
-  // ========== عرض المنتج ==========
   const renderProduct = useCallback(
     ({ item }: { item: ProductWithDetails }) => {
       const inCart = cartProductIds.includes(item.id);
@@ -333,7 +320,13 @@ export const PopularProductsList: React.FC<PopularProductsListProps> = ({
   }
 
   if (popularProducts.length === 0) {
-    return null;
+    return (
+      <EmptyState
+        icon="package-variant"
+        title="لا توجد منتجات مسجلة"
+        subtitle="يرجى إضافة منتجات جديدة عبر قسم المنتجات لكي تتمكن من إضافتها للفاتورة."
+      />
+    );
   }
 
   return (
@@ -368,7 +361,10 @@ export const PopularProductsList: React.FC<PopularProductsListProps> = ({
         <View
           style={[
             styles.addBar,
-            { backgroundColor: theme.colors.primaryContainer },
+            {
+              backgroundColor: theme.colors.primaryContainer,
+              borderTopColor: theme.colors.outlineVariant,
+            },
           ]}
         >
           <Text
@@ -419,22 +415,22 @@ const styles = StyleSheet.create({
   },
   productInfo: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   productMeta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
   },
   actionSection: {
-    width: 90,
+    minWidth: 40,
     alignItems: "flex-end",
     justifyContent: "center",
   },
   qtyControl: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
   },
   qtyButton: {
     width: 28,
@@ -452,7 +448,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 12,
+    paddingVertical: 12,
+    borderTopWidth: 1,
   },
 });

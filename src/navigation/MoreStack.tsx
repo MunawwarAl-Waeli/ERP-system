@@ -10,6 +10,13 @@ import { ProductPerformanceScreen } from "@features/reports/screens/ProductPerfo
 import { SettingsScreen } from "@features/settings/screens/SettingsScreen";
 import { ChartOfAccountsScreen } from "@features/accounting/screens/ChartOfAccountsScreen";
 import { AccountingSettingsScreen } from "@features/accounting/screens/AccountingSettingsScreen";
+import { SystemDiagnosticScreen } from "@features/settings/screens/SystemDiagnosticScreen";
+import { CategoryManagementScreen } from "@features/products/screens/CategoryManagementScreen";
+import { UnitManagementScreen } from "@features/products/screens/UnitManagementScreen";
+import { SupplierListScreen } from "@features/suppliers/screens/SupplierListScreen";
+import { SupplierLedgerScreen } from "@features/suppliers/screens/SupplierLedgerScreen";
+import { PurchaseFormScreen } from "@features/purchase/screens/PurchaseFormScreen";
+
 
 const Stack = createNativeStackNavigator<MoreStackParamList>();
 
@@ -30,5 +37,15 @@ export const MoreStack: React.FC = () => (
       name="AccountingSettings"
       component={AccountingSettingsScreen}
     />
+    <Stack.Screen name="SystemDiagnostic" component={SystemDiagnosticScreen} />
+    <Stack.Screen
+      name="CategoryManagement"
+      component={CategoryManagementScreen}
+    />
+    <Stack.Screen name="UnitManagement" component={UnitManagementScreen} />
+    {/* شاشات الموردين والمشتريات داخل مكدس المزيد */}
+    <Stack.Screen name="SupplierList" component={SupplierListScreen} />
+    <Stack.Screen name="SupplierLedger" component={SupplierLedgerScreen} />
+    <Stack.Screen name="PurchaseForm" component={PurchaseFormScreen} />
   </Stack.Navigator>
 );
