@@ -28,11 +28,11 @@ import { CustomerStack } from "./CustomerStack";
 import { BillingStack } from "./BillingStack";
 import { InventoryStack } from "./InventoryStack";
 import { MoreStack } from "./MoreStack";
-import { database } from "@core/database";
-import Customer from "@core/database/models/Customer";
-import ReceiptVoucher from "@core/database/models/ReceiptVoucher";
-import PaymentVoucher from "@core/database/models/PaymentVoucher";
+import { database } from "src/database";
+import Customer from "src/database/models/Customer";
 import { generateNumber } from "@shared/utils/id";
+import { receiptVoucherRepository } from "src/application/features/ReceiptVoucher/repositories/receiptVoucherRepository";
+import { AccountingSettingsService } from "@core/services/AccountingSettingsService";
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -51,9 +51,7 @@ export const MainTabNavigator: React.FC = () => {
   );
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
-  const [transactionType, setTransactionType] = useState<"receipt" | "payment">(
-    "receipt",
-  ); // receipt = سند قبض (له), payment = سند صرف (عليه)
+  const [isSaving, setIsSaving] = useState(false);
 
   // Load customers for quick search
   const handleOpenModal = async () => {
@@ -81,40 +79,21 @@ export const MainTabNavigator: React.FC = () => {
       return;
     }
 
+    if (isSaving) return;
+    setIsSaving(true);
     try {
-      await database.write(async () => {
-        if (transactionType === "receipt") {
-          // سند قبض (قبض من عميل - له)
-          await database
-            .get<ReceiptVoucher>("receipt_vouchers")
-            .create((rv) => {
-              rv.voucherNumber = generateNumber("REC");
-              rv.voucherDate = new Date();
-              rv.receiptAccountId = "cash_account";
-              rv.customerId = selectedCustomer.id;
-              rv.amount = numericAmount;
-              rv.description =
-                notes || `سند قبض سريع من العميل ${selectedCustomer.name}`;
-              rv.createdBy = "user";
-              rv.status = "posted";
-            });
-        } else {
-          // سند صرف (صرف للعميل / عليه)
-          await database
-            .get<PaymentVoucher>("payment_vouchers")
-            .create((pv) => {
-              pv.voucherNumber = generateNumber("PAY");
-              pv.voucherDate = new Date();
-              pv.paymentAccountId = "cash_account";
-              pv.referenceType = "customers";
-              pv.referenceId = selectedCustomer.id;
-              pv.amount = numericAmount;
-              pv.description =
-                notes || `سند صرف سريع للعميل ${selectedCustomer.name}`;
-              pv.createdBy = "user";
-              pv.status = "posted";
-            });
-        }
+      const settings = await AccountingSettingsService.getSettings();
+      if (!settings.cashAccountId) {
+        throw new Error("لم يتم تحديد حساب الصندوق الافتراضي.");
+      }
+      await receiptVoucherRepository.createAndAllocateToCustomer({
+        voucherNumber: generateNumber("REC"),
+        voucherDate: new Date(),
+        paymentAccountId: settings.cashAccountId,
+        customerId: selectedCustomer.id,
+        amount: numericAmount,
+        description: notes || `سند قبض سريع من العميل ${selectedCustomer.name}`,
+        createdBy: "local-user",
       });
 
       Alert.alert(
@@ -126,9 +105,14 @@ export const MainTabNavigator: React.FC = () => {
       setAmount("");
       setNotes("");
       setSearchQuery("");
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
-      Alert.alert("خطأ", e?.message || "حدث خطأ أثناء حفظ الحركة المالية.");
+      Alert.alert(
+        "خطأ",
+        e instanceof Error ? e.message : "حدث خطأ أثناء حفظ الحركة المالية.",
+      );
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -256,58 +240,9 @@ export const MainTabNavigator: React.FC = () => {
                 إضافة حركة مالية سريعة
               </Text>
 
-              {/* اختيار نوع الحركة: قبض (له) أو صرف (عليه) */}
-              <View style={styles.typeSelector}>
-                <TouchableOpacity
-                  style={[
-                    styles.typeBtn,
-                    {
-                      backgroundColor:
-                        transactionType === "receipt"
-                          ? theme.colors.primaryContainer
-                          : theme.colors.surfaceVariant,
-                    },
-                  ]}
-                  onPress={() => setTransactionType("receipt")}
-                >
-                  <Text
-                    style={{
-                      fontWeight: "bold",
-                      color:
-                        transactionType === "receipt"
-                          ? theme.colors.onPrimaryContainer
-                          : theme.colors.onSurfaceVariant,
-                    }}
-                  >
-                    سند قبض (له)
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.typeBtn,
-                    {
-                      backgroundColor:
-                        transactionType === "payment"
-                          ? theme.colors.errorContainer
-                          : theme.colors.surfaceVariant,
-                    },
-                  ]}
-                  onPress={() => setTransactionType("payment")}
-                >
-                  <Text
-                    style={{
-                      fontWeight: "bold",
-                      color:
-                        transactionType === "payment"
-                          ? theme.colors.onErrorContainer
-                          : theme.colors.onSurfaceVariant,
-                    }}
-                  >
-                    سند صرف (عليه)
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.transactionHint}>
+                سند قبض من العميل، مع تخصيص آلي على الفواتير المستحقة.
+              </Text>
 
               {/* بحث عن عميل */}
               <TextInput
@@ -389,6 +324,8 @@ export const MainTabNavigator: React.FC = () => {
                 <Button
                   mode="contained"
                   onPress={handleSaveQuickTransaction}
+                  loading={isSaving}
+                  disabled={isSaving}
                   style={styles.halfBtn}
                 >
                   حفظ الحركة
@@ -432,16 +369,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontWeight: "bold",
   },
-  typeSelector: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 16,
-  },
-  typeBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 8,
+  transactionHint: {
+    marginBottom: 12,
+    color: "#6B7280",
+    textAlign: "center",
   },
   input: {
     marginBottom: 12,

@@ -116,3 +116,7 @@ mmkv/
 /android/app/.cxx
 /android/.kotlin
 /screenshots
+
+/android/local-maven/
+*.aar
+*.aar.jar

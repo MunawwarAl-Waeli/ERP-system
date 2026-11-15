@@ -1,4 +1,4 @@
-import PurchaseInvoice from "@core/database/models/PurchaseInvoice";
+import PurchaseInvoice from "src/database/models/PurchaseInvoice";
 import { JournalService } from "./JournalService";
 import { AccountingSettingsService } from "./AccountingSettingsService";
 import { Model } from "@nozbe/watermelondb";
@@ -70,7 +70,7 @@ export const PurchaseAccountingService = {
     }
 
     return JournalService.prepareCreateEntry({
-      date: invoice.invoiceDate,
+      entryDate: invoice.invoiceDate,
 
       description: `فاتورة شراء رقم ${invoice.invoiceNumber ?? invoice.id}`,
 
@@ -81,6 +81,7 @@ export const PurchaseAccountingService = {
       referenceId: invoice.id,
 
       createdBy: invoice.createdBy,
+      idempotencyKey: `purchase-invoice:${invoice.id}`,
     });
   },
 };

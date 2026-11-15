@@ -1,55 +1,88 @@
-/* eslint-disable require-await */
-/* eslint-disable arrow-body-style */
-import { database } from "@core/database";
-import JournalEntry from "@core/database/models/JournalEntry";
-import JournalEntryLine from "@core/database/models/JournalEntryLine";
-import { Model } from "@nozbe/watermelondb";
+import { database } from "src/database";
+import JournalEntry from "src/database/models/JournalEntry";
+import JournalEntryLine from "src/database/models/JournalEntryLine";
+import { BaseCommand, IntegerMoney, Timestamp } from "@core/types";
+import { Model, Q } from "@nozbe/watermelondb";
 
-const entries = database.get<JournalEntry>("journal_entries");
+const entriesCollection = database.get<JournalEntry>("journal_entries");
 const linesCollection = database.get<JournalEntryLine>("journal_entry_lines");
 
 export interface JournalLineInput {
   accountId: string;
-  debit: number;
-  credit: number;
+  debit: IntegerMoney;
+  credit: IntegerMoney;
 }
 
-interface JournalEntryData {
-  date: Date;
-  description: string;
+export interface CreateJournalEntryCommand extends BaseCommand {
+  entryDate: Timestamp;
+  referenceType?: string;
+  referenceId?: string;
+  description?: string;
   lines: JournalLineInput[];
-  referenceType?: string | null;
-  referenceId?: string | null;
-  createdBy?: string | null;
 }
 
 /**
- * Internal preparation function. It validates the entry and returns prepared records without saving them.
- * This is the single source of truth for journal entry creation logic.
+ * دالة التحضير الداخلية الصارمة
+ * تُنشئ كائنات الـ Models في الذاكرة وتُرجع العمليات مع كائن القيد الأساسي مباشرة.
  */
-async function _prepareJournal(data: JournalEntryData): Promise<Model[]> {
-  const totalDebit = data.lines.reduce((sum, line) => sum + line.debit, 0);
-  const totalCredit = data.lines.reduce((sum, line) => sum + line.credit, 0);
-
-  if (Math.abs(totalDebit - totalCredit) > 0.001) {
+async function _prepareJournal(
+  command: CreateJournalEntryCommand,
+): Promise<{ operations: Model[]; entry: JournalEntry }> {
+  if (!command.idempotencyKey?.trim()) {
     throw new Error(
-      `Journal entry is unbalanced. Debit: ${totalDebit}, Credit: ${totalCredit}`,
+      "ACCOUNTING_IDEMPOTENCY_ERROR: idempotencyKey is required.",
     );
+  }
+
+  const existingEntries = await entriesCollection
+    .query(Q.where("idempotency_key", command.idempotencyKey))
+    .fetch();
+  if (existingEntries.length > 0) {
+    return { operations: [], entry: existingEntries[0] };
+  }
+
+  const totalDebit = command.lines.reduce((sum, line) => sum + line.debit, 0);
+  const totalCredit = command.lines.reduce((sum, line) => sum + line.credit, 0);
+
+  if (command.lines.length === 0 || totalDebit !== totalCredit) {
+    throw new Error(
+      `ACCOUNTING_BALANCE_ERROR: Journal entry is unbalanced. Total Debit (${totalDebit}) must equal Total Credit (${totalCredit}).`,
+    );
+  }
+
+  for (const line of command.lines) {
+    if (!line.accountId?.trim()) {
+      throw new Error("ACCOUNTING_LINE_ERROR: accountId is required.");
+    }
+    if (line.debit > 0 && line.credit > 0) {
+      throw new Error(
+        `ACCOUNTING_LINE_ERROR: A single journal line cannot have both debit and credit greater than zero.`,
+      );
+    }
+    if (line.debit < 0 || line.credit < 0) {
+      throw new Error(
+        `ACCOUNTING_LINE_ERROR: Debit and credit amounts cannot be negative.`,
+      );
+    }
   }
 
   const preparedOperations: Model[] = [];
 
-  const entry = entries.prepareCreate((e) => {
-    e.entryDate = data.date;
-    e.description = data.description;
-    e.referenceType = data.referenceType ?? null;
-    e.referenceId = data.referenceId ?? null;
+  // إنشاء رأس القيد في الذاكرة (متاح مباشرة للاستخدام)
+  const entry = await entriesCollection.prepareCreate((e) => {
+    e.entryDate = command.entryDate;
+    e.description = command.description ?? "";
+    e.referenceType = command.referenceType ?? undefined;
+    e.referenceId = command.referenceId ?? undefined;
     e.status = "posted";
-    e.createdBy = data.createdBy ?? "";
+    e.createdBy = command.createdBy;
+    e.idempotencyKey = command.idempotencyKey;
+    e.isReversed = false;
   });
   preparedOperations.push(entry);
 
-  for (const line of data.lines) {
+  // إنشاء أسطر القيد في الذاكرة
+  for (const line of command.lines) {
     const preparedLine = linesCollection.prepareCreate((l) => {
       l.journalEntry.set(entry);
       l.accountId = line.accountId;
@@ -59,45 +92,50 @@ async function _prepareJournal(data: JournalEntryData): Promise<Model[]> {
     preparedOperations.push(preparedLine);
   }
 
-  return preparedOperations;
+  return { operations: preparedOperations, entry };
 }
 
 export const JournalService = {
   /**
-   * Prepares journal entry records for batching within a larger transaction.
-   * Does NOT write to the database.
+   * تحضير سجلات القيد لدمجها في معاملة أكبر (Batching).
    */
-  prepareCreateEntry: (data: JournalEntryData): Promise<Model[]> => {
-    return _prepareJournal(data);
+  prepareCreateEntry: async (
+    command: CreateJournalEntryCommand,
+  ): Promise<Model[]> => {
+    const { operations } = await _prepareJournal(command);
+    return operations;
   },
 
   /**
-   * Creates and immediately persists a journal entry in its own transaction.
-   * Use this for standalone journal entries.
+   * إنشاء وحفظ قيد محاسبي مستقل بذاته بشكل ذري آمن.
    */
-  createEntry: async (data: JournalEntryData): Promise<JournalEntry> => {
-    const preparedOperations = await _prepareJournal(data);
-    return database.write(async () => {
-      const batchResult = await database.batch(...preparedOperations);
-      // The first operation is the JournalEntry itself
-      return batchResult[0] as JournalEntry;
+  createEntry: async (
+    command: CreateJournalEntryCommand,
+  ): Promise<JournalEntry> => {
+    const { operations, entry } = await _prepareJournal(command);
+
+    await database.write(async () => {
+      await database.batch(...operations); // database.batch تُرجع void، لذا لا ننتظر منها نتيجة
     });
+
+    return entry; // نُرجع كائن الـ entry الذي تم تحضيره مسبقاً بكل ثقة
   },
 
-  postEntry: (entry: JournalEntry) =>
-    database.write(async () => {
-      await entry.update((e) => (e.status = "posted"));
-    }),
-
-  cancelEntry: (entry: JournalEntry) =>
-    database.write(async () => {
-      await entry.update((e) => (e.status = "cancelled"));
-    }),
+  /**
+   * تحضير عملية عكس قيد محاسبي.
+   */
   prepareReverseEntry: async (
     originalEntry: JournalEntry,
-    description: string,
-    currentUserId?: string,
-  ): Promise<Model[]> => {
+    reason: string,
+    command: BaseCommand,
+    reversalTimestamp: Timestamp,
+  ): Promise<{ operations: Model[]; reversalEntry: JournalEntry }> => {
+    if (originalEntry.isReversed) {
+      throw new Error(
+        `REVERSAL_ERROR: Journal entry [${originalEntry.id}] has already been reversed.`,
+      );
+    }
+
     const originalLines = await originalEntry.lines.fetch();
 
     const reversedLines: JournalLineInput[] = originalLines.map(
@@ -108,53 +146,66 @@ export const JournalService = {
       }),
     );
 
-    return JournalService.prepareCreateEntry({
-      date: new Date(),
-      description,
-      lines: reversedLines,
-      referenceType: "reversal",
+    const reversalCommand: CreateJournalEntryCommand = {
+      ...command,
+      entryDate: reversalTimestamp,
+      description: `قيد عكسي للقيد رقم [${originalEntry.id}]. السبب: ${reason}`,
+      referenceType: originalEntry.referenceType ?? undefined,
       referenceId: originalEntry.id,
-      createdBy: currentUserId,
+      lines: reversedLines,
+    };
+
+    const { operations: reversalOperations, entry: reversalEntry } =
+      await _prepareJournal(reversalCommand);
+
+    const updateOriginalOperation = originalEntry.prepareUpdate((e) => {
+      e.isReversed = true;
+      e.reversedAt = reversalTimestamp;
     });
+
+    return {
+      operations: [...reversalOperations, updateOriginalOperation],
+      reversalEntry,
+    };
   },
+
+  /**
+   * تنفيذ عكس القيد المحاسبي فورياً بشكل ذري.
+   */
   reverseEntry: async (
     originalEntry: JournalEntry,
-    description: string,
-    currentUserId?: string,
-  ) => {
-    // جلب أسطر القيد الأصلي
-    const originalLines = await originalEntry.lines.fetch();
+    reason: string,
+    command: BaseCommand,
+  ): Promise<JournalEntry> => {
+    const reversalTimestamp = Date.now();
+    const { operations, reversalEntry } =
+      await JournalService.prepareReverseEntry(
+        originalEntry,
+        reason,
+        command,
+        reversalTimestamp,
+      );
 
-    // تحديد نوع line صراحة لحل خطأ any
-    const reversedLines: JournalLineInput[] = originalLines.map(
-      (line: JournalEntryLine) => ({
-        accountId: line.accountId,
-        debit: line.credit, // الدائن يصبح مدين
-        credit: line.debit, // المدين يصبح دائن
-      }),
-    );
-
-    // إنشاء القيد العكسي بنفس خدمة إنشاء القيود
-    return JournalService.createEntry({
-      date: new Date(), // تاريخ الإلغاء
-      description,
-      lines: reversedLines,
-      referenceType: originalEntry.referenceType,
-      referenceId: originalEntry.referenceId,
-      createdBy: currentUserId,
+    await database.write(async () => {
+      await database.batch(...operations);
     });
+
+    return reversalEntry;
   },
 
+  /**
+   * إنشاء القيد الافتتاحي.
+   */
   createOpeningBalanceEntry: (
     lines: JournalLineInput[],
-    date: Date,
-    userId?: string,
-  ) =>
+    entryDate: Timestamp,
+    command: BaseCommand,
+  ): Promise<JournalEntry> =>
     JournalService.createEntry({
-      date,
-      description: "القيد الافتتاحي",
-      lines,
+      ...command,
+      entryDate,
+      description: "القيد الافتتاحي للنظام",
       referenceType: "opening_balance",
-      createdBy: userId,
+      lines,
     }),
 };

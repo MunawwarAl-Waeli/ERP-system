@@ -1,6 +1,6 @@
-# Cloude Code ToolBox — MCP & Skills awareness
+# Claude Code ToolBox — MCP & Skills awareness
 
-_Generated: 2026-08-24T21:28:23.964Z_
+_Generated: 2026-11-14T12:26:01.679Z_
 
 ## How to use this report
 
@@ -43,4 +43,4 @@ _None found._
 - **Edit config:** Open `~/.claude.json` (user MCP) or `<workspace>/.mcp.json` (project MCP) via the extension commands.
 - **Refresh this report:** run **Intelligence — scan MCP & Skills awareness** again after changing MCP config or adding skills.
 
-_Report from Cloude Code ToolBox extension._
+_Report from Claude Code ToolBox extension._

@@ -1,31 +1,45 @@
 module.exports = {
-  presets: ['module:@react-native/babel-preset'],
+  presets: ["module:@react-native/babel-preset"],
   plugins: [
     [
-      '@babel/plugin-proposal-decorators',
+      "@babel/plugin-proposal-decorators",
       {
         legacy: true,
       },
     ],
     [
-      'module-resolver',
+      "module-resolver",
       {
-        root: ['./src'],
-        extensions: ['.ios.ts', '.android.ts', '.ts', '.ios.tsx', '.android.tsx', '.tsx', '.json'],
+        root: ["./"],
+        extensions: [
+          ".ios.ts",
+          ".android.ts",
+          ".ts",
+          ".ios.tsx",
+          ".android.tsx",
+          ".tsx",
+          ".js",
+          ".jsx",
+          ".json",
+        ],
         alias: {
-          '@app': './src/app',
-          '@core': './src/core',
-          '@shared': './src/shared',
-          '@features': './src/features',
-          '@services': './src/services',
-          '@assets': './src/assets',
+          src: "./src",
+          "@app": "./src/app",
+          "@core": "./src/core",
+          "@shared": "./src/shared",
+          "@features": "./src/application/features",
+          "@application": "./src/application",
+          "@services": "./src/services",
+          "@database": "./src/database",
+          "@infrastructure": "./src/infrastructure",
+          "@assets": "./src/assets",
         },
       },
     ],
   ],
   env: {
     production: {
-      plugins: ['react-native-paper/babel'],
+      plugins: ["react-native-paper/babel"],
     },
   },
 };

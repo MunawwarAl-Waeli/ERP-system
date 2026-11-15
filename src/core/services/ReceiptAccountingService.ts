@@ -1,70 +1,45 @@
-// src/core/services/accounting/ReceiptAccountingService.ts
-import ReceiptVoucher from "@core/database/models/ReceiptVoucher";
-import PaymentAllocation from "@core/database/models/PaymentAllocation";
+import ReceiptVoucher from "src/database/models/ReceiptVoucher";
+import ReceiptAllocation from "src/database/models/ReceiptAllocation";
 import { JournalService, JournalLineInput } from "./JournalService";
 import { AccountingSettingsService } from "./AccountingSettingsService";
 import { Model } from "@nozbe/watermelondb";
+import { database } from "src/database";
 
+/** خدمة تحضير قيد سند القبض فقط؛ الذمم والتخصيصات مسؤولية حالة الاستخدام. */
 export const ReceiptAccountingService = {
-  /**
-   * تحضير قيد سند القبض
-   */
+  createReceiptEntry: async (voucher: ReceiptVoucher): Promise<void> => {
+    const operations = await ReceiptAccountingService.prepareReceiptEntry(voucher);
+    if (operations.length === 0) return;
+    await database.write(async () => {
+      await database.batch(...operations);
+    });
+  },
+
   prepareReceiptEntry: async (
     voucher: ReceiptVoucher,
-    preparedAllocations: PaymentAllocation[] = [],
+    preparedAllocations: ReceiptAllocation[] = [],
   ): Promise<Model[]> => {
     const settings = await AccountingSettingsService.getSettings();
-    const lines: JournalLineInput[] = [];
-
-    lines.push({
-      accountId: voucher.paymentAccountId,
-      debit: voucher.amount,
-      credit: 0,
-    });
-
-    if (preparedAllocations.length > 0) {
-      for (const allocation of preparedAllocations) {
-        let creditAccountId = settings.salesAccountId;
-
-        if (
-          allocation.allocatableType === "sales_invoices" ||
-          allocation.allocatableType === "sales_invoice"
-        ) {
-          creditAccountId = settings.customersAccountId;
-        }
-
-        lines.push({
-          accountId: creditAccountId,
-          debit: 0,
-          credit: allocation.amount,
-        });
-      }
-    } else {
-      let creditAccountId = settings.salesAccountId;
-
-      if (
-        voucher.referenceType === "customers" ||
-        voucher.referenceType === "customer"
-      ) {
-        creditAccountId = settings.customersAccountId;
-      }
-
-      lines.push({
-        accountId: creditAccountId,
+    const allocatedAmount = preparedAllocations.reduce(
+      (sum, allocation) => sum + allocation.amount,
+      0,
+    );
+    const lines: JournalLineInput[] = [
+      { accountId: voucher.paymentAccount.id, debit: voucher.amount, credit: 0 },
+      {
+        accountId: settings.customersAccountId,
         debit: 0,
-        credit: voucher.amount,
-      });
-    }
-
+        credit: allocatedAmount || voucher.amount,
+      },
+    ];
     return JournalService.prepareCreateEntry({
-      date: voucher.voucherDate,
-      description: `سند قبض رقم: ${voucher.voucherNumber} - ${
-        voucher.description || ""
-      }`,
+      entryDate: voucher.voucherDate,
+      description: `سند قبض رقم: ${voucher.voucherNumber ?? voucher.id}`,
       lines,
       referenceType: "receipt_voucher",
       referenceId: voucher.id,
       createdBy: voucher.createdBy,
+      idempotencyKey: `receipt-voucher:${voucher.id}`,
     });
   },
 };

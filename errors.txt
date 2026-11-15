@@ -1,0 +1,181 @@
+cd C:\xampp\htdocs\Laravel\kiranamitra
+npx react-native start --reset-cache
+
+adb -s R83Y30SNVMH reverse tcp:8081 tcp:8081
+adb -s R83Y30SNVMH shell am force-stop com.kiranamitra
+adb -s R83Y30SNVMH shell monkey -p com.kiranamitra -c android.intent.category.LAUNCHER 1
+
+adb -s R83Y30SNVMH shell pm clear com.kiranamitra امر حذف قاعدة بيانات التطبيق
+
+أتفهم إحباطك تمامًا. المشكلة لم تكن فيك، بل في طريقة تعاملي مع المشكلة (الحل اليدوي كان خطأً). الآن سأعطيك الدليل الذي كان يجب أن أقدمه من البداية: خريطة أوامر كاملة، وكيفية استخدامها باحتراف، وكيف تتجنب المشاكل قبل أن تحدث.
+
+---
+
+1. القاعدة الذهبية: من يتحكم في ماذا؟
+
+قبل أي أمر، افهم التقسيم:
+
+الأداة مسؤوليتها أمثلة
+React Native CLI (npx react-native ...) تشغيل التطبيق، Metro Bundler، البناء الكامل run-android, start
+Gradle (./gradlew ...) البناء الأصلي (APK/AAB)، إدارة التبعيات، المهام assembleDebug, clean, dependencies
+
+قاعدة عملية: عندما تريد تشغيل التطبيق، استخدم npx react-native run-android. عندما تريد تشخيص مشكلة بناء أو بناء ملف للتوزيع، ادخل إلى مجلد android واستخدم ./gradlew.
+
+---
+
+2. أوامر React Native CLI الأساسية
+
+هذه الأوامر تعمل من جذر المشروع (وليس من داخل android).
+
+الأمر ماذا يفعل متى تستخدمه
+npx react-native start يشغّل Metro Bundler فقط (خادم JavaScript) عندما يكون التطبيق مثبتًا بالفعل وتريد تحديث الكود فقط
+npx react-native run-android يبني APK، يثبته على الجهاز/المحاكي، ويشغّل Metro التشغيل العادي
+npx react-native run-android --active-arch-only يبني فقط لمعمارية الجهاز المتصل (بدلاً من 4 معماريات) تسريع البناء بنسبة تصل إلى 75% أثناء التطوير
+npx react-native start --reset-cache يمسح ذاكرة Metro المؤقتة ويشغّلها من جديد عند ظهور أخطاء غريبة في JavaScript أو "Unable to resolve module"
+npx react-native run-android --deviceId=<ID> يحدد الجهاز المستهدف بالاسم عند توصيل أكثر من جهاز
+
+نصيحة احترافية: أضف --active-arch-only إلى أمر التشغيل اليومي. هذا وحده سيوفر عليك دقائق في كل بناء.
+
+---
+
+3. أوامر Gradle التي ستحتاجها فعلاً (من داخل android)
+
+لا تحفظ كل الأوامر. هذه القائمة المختصرة تكفي 95% من الحالات:
+
+أ. أوامر البناء
+
+الأمر الناتج متى تستخدمه
+./gradlew assembleDebug APK للاختبار (debug) عندما تريد بناء APK دون تثبيت (مثلاً لإرساله لشخص)
+./gradlew installDebug يبني ويثبّت APK على الجهاز المتصل بديل مباشر لـ run-android دون تشغيل Metro
+./gradlew assembleRelease APK للتوزيع (release) قبل النشر
+./gradlew bundleRelease AAB لمتجر Google Play للنشر على المتجر
+./gradlew signingReport يعرض بصمات SHA-1 و SHA-256 للتوقيع عند إعداد Google Sign-In أو Firebase
+
+ب. أوامر التشخيص (هي التي تنقذك)
+
+الأمر ماذا يعرض متى تستخدمه
+./gradlew tasks قائمة بكل المهام المتاحة لتعرف اسم المهمة الصحيح بدلاً من التخمين
+./gradlew :app:dependencies شجرة التبعيات الكاملة لكل مكتبة وإصدارها عندما تريد معرفة من جلب هذه المكتبة ولماذا
+./gradlew :app:dependencyInsight --dependency <name> يوضح من طلب هذه المكتبة وبأي إصدار عند تعارض الإصدارات (مثل مشكلة kotlin-stdlib-jdk7 التي واجهتها)
+./gradlew buildEnvironment تبعيات أدوات البناء (buildscript) عند فشل classpath في build.gradle
+
+ج. أوامر التنظيف (استخدمها بحذر)
+
+الأمر ماذا يمسح تحذير
+./gradlew clean مجلد build في المشروع الحالي فقط لا يمسح التبعيات المحملة (آمن نسبياً)
+rm -rf android/app/build android/.gradle مجلدات بناء Android آمن، لكنه يجبر Gradle على إعادة بناء الطبقة الأصلية (بطيء)
+rm -rf ~/.gradle/caches كل التبعيات المحملة على جهازك خطر! لا تفعله إلا إذا كنت مستعداً لإعادة تنزيل ~500MB
+
+القاعدة: لا تستخدم clean كعلاج أول. استخدمه فقط عندما يتصرف البناء بشكل غير متوقع بعد تغييرات هيكلية.
+
+---
+
+4. خيارات سطر الأوامر التي تغيّر قواعد اللعبة
+
+هذه الخيارات تُضاف إلى أي أمر Gradle:
+
+الخيار التأثير متى تستخدمه
+--stacktrace يعرض تتبع الخطأ الكامل عندما ترى BUILD FAILED برسالة غامضة
+--info يعرض تفاصيل إضافية (بما فيها روابط التنزيل) لتشخيص مشاكل الشبكة أو التبعيات
+--debug تفاصيل أكثر (ضخمة) نادراً، عند الحاجة القصوى
+--scan ينشئ تقريراً على الإنترنت بتحليل البناء لمشاركة مشكلة مع فريق أو مجتمع
+--offline يمنع Gradle من الاتصال بالشبكة فقط بعد نجاح البناء الأول، لتشغيله دون إنترنت
+--refresh-dependencies يجبر Gradle على إعادة التحقق من التبعيات عند الشك في تلف إصدار محمّل
+--dry-run أو -m يعرض المهام التي ستُنفذ دون تنفيذها فعلاً لفهم تسلسل البناء قبل تشغيله
+
+مثال عملي على استخدام --info لتشخيص مشكلة شبكة:
+
+```powershell
+./gradlew app:assembleDebug --info
+```
+
+في الناتج، ابحث عن Downloading https://.... إذا توقف البناء عند رابط معين، فأنت تعرف بالضبط أي تبعية تسبب المشكلة.
+
+---
+
+5. تسريع البناء: الإعدادات التي تستحق التعديل
+
+أضف هذه الأسطر إلى android/gradle.properties مرة واحدة:
+
+```properties
+# 1. ذاكرة أكبر (يمنع توقف البناء عند التبعيات الكبيرة)
+org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m
+
+# 2. تنفيذ متوازٍ للمهام (يستخدم كل أنوية المعالج)
+org.gradle.parallel=true
+
+# 3. إعادة استخدام نتائج المهام السابقة
+org.gradle.caching=true
+
+# 4. (اختياري) تكوين حسب الطلب
+org.gradle.configureondemand=true
+```
+
+
+
+بالإضافة إلى: استخدم npx react-native run-android --active-arch-only لتجنب بناء 4 معماريات في كل مرة.
+
+---
+
+6. الأخطاء الشائعة: دليل سريع للتشخيص
+
+رسالة الخطأ السبب الأرجح الحل
+Could not find <library> التبعية غير محملة أو الإصدار خاطئ استخدم ./gradlew :app:dependencies لترى ما هو متاح، ثم --refresh-dependencies
+Failed to resolve: <library> تعارض إصدارات ./gradlew :app:dependencyInsight --dependency <name> لترى من طلبها
+Unsupported class file major version إصدار JDK غير متوافق مع Gradle تأكد أن JDK 17 (أو حسب متطلبات مشروعك) هو المستخدم
+SDK location not found ANDROID_HOME غير مضبوط عيّن ANDROID_HOME في متغيرات البيئة
+Execution failed for task ':app:... مشكلة في الكود الأصلي أو الإعدادات أضف --stacktrace لترى السبب الجذري
+Unable to load script (شاشة حمراء) Metro لا يعمل أو adb reverse غير منفذ npx react-native start + adb reverse tcp:8081 tcp:8081
+error: resource ... not found تعارض في موارد Android ./gradlew clean ثم أعد البناء
+Timeout أو توقف مفاجئ شبكة بطيئة أو ذاكرة غير كافية زد -Xmx في gradle.properties، وأعد المحاولة (Gradle يكمل من حيث توقف)
+
+قاعدة ذهبية: عند أي خطأ، اقرأ آخر 10 أسطر من الناتج أولاً. غالباً تحمل الإجابة.
+
+---
+
+7. سير عمل احترافي ليوم عادي
+
+بدلاً من عشوائية الأوامر، اتبع هذا التسلسل:
+
+```powershell
+# 1. إذا غيّرت كود JavaScript فقط (لا تغييرات أصلية):
+#    لا تحتاج بناءً جديداً. فقط احفظ الملف، واضغط 'r' في Metro.
+
+# 2. إذا أضفت مكتبة جديدة (npm install):
+npx react-native run-android --active-arch-only
+
+# 3. إذا ظهر خطأ غامض:
+cd android
+./gradlew clean
+cd ..
+npx react-native run-android --active-arch-only
+
+# 4. إذا استمر الخطأ:
+cd android
+./gradlew :app:dependencies > deps.txt
+# افتح deps.txt وابحث عن المكتبة المسببة
+
+# 5. إذا كنت متأكداً أن الخطأ من تبعية تالفة:
+cd android
+./gradlew app:assembleDebug --refresh-dependencies
+
+# 6. إذا أردت بناء APK للإرسال (دون جهاز متصل):
+cd android
+./gradlew assembleDebug
+# الملف في: android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+---
+
+8. نصائح ختامية (الدروس المستفادة من جلستنا)
+
+1. لا تلجأ إلى --offline إلا بعد نجاح بناء واحد كامل. الحل اليدوي للتبعيات غير عملي في React Native.
+2. clean ليس دواءً لكل شيء. استخدمه فقط عند الضرورة.
+3. --active-arch-only هو صديقك اليومي. يوفّر وقتاً هائلاً.
+4. ./gradlew :app:dependencies هو مفتاح حل 80% من مشاكل التبعيات. تعلم قراءته.
+5. لا تقتل عمليات Java أثناء البناء. إذا توقف البناء، أعد الأمر فقط؛ Gradle يكمل من حيث توقف.
+6. احفظ ~/.gradle/caches. هذا هو الكنز الحقيقي. بعد نجاح البناء الأول، لن تحتاج إنترنت مجدداً (طالما لم تغيّر الإصدارات).
+
+---
+
+الخلاصة: المشروع الآن سيعمل. بعد نجاح البناء الأول (أونلاين)، ستشغّله في أي وقت بـ npx react-native run-android --active-arch-only دون إنترنت، طالما لم تحذف ~/.gradle/caches. احتفظ بهذا الدليل كمرجع سريع.

@@ -1,13 +1,15 @@
-{
+﻿{
   "title": "Inventory",
   "stockLevel": "Stock Level",
   "adjustStock": "Adjust Stock",
+  "adjustStockMessage": "Enter the quantity to add or subtract (use negative to subtract)",
+  "enterQuantity": "Enter Quantity",
   "addStock": "Add Stock",
   "removeStock": "Remove Stock",
   "reason": "Reason",
   "reasons": {
     "purchase": "New Purchase",
-    "damage": "Damaged",
+    "damage": "Damage",
     "return": "Customer Return",
     "manual": "Manual Adjustment",
     "sale": "Sale"
@@ -17,11 +19,15 @@
   "outOfStock": "Out of Stock",
   "inStock": "In Stock",
   "adjustmentSaved": "Stock adjusted successfully",
+  "adjustmentSuccess": "Stock adjusted successfully",
+  "invalidQuantity": "Invalid quantity",
   "quantity": "Quantity",
   "notes": "Notes (optional)",
   "currentStockLabel": "Current Stock: {{count}} {{unit}}",
   "newStockLabel": "New Stock: {{count}} {{unit}}",
   "noInventoryLogs": "No stock adjustments yet",
+  "noBatches": "No batches recorded",
+  "noMovements": "No movements recorded",
   "stockValue": "Total Stock Value",
   "lowStockCount": "{{count}} item below threshold",
   "lowStockCount_plural": "{{count}} items below threshold",
@@ -38,5 +44,21 @@
   "costValue": "Cost Value",
   "potentialProfit": "Potential Profit",
   "itemsShowing": "items",
-  "valueLabel": "Value"
+  "valueLabel": "Value",
+  "batches": "Batches",
+  "recentMovements": "Recent Movements",
+  "received": "Received",
+  "unitCost": "Unit Cost",
+  "movementTypes": {
+    "purchase_in": "Purchase (In)",
+    "sale_out": "Sale (Out)",
+    "sale_return": "Sales Return",
+    "purchase_return": "Purchase Return",
+    "adjustment_in": "Adjustment (Add)",
+    "adjustment_out": "Adjustment (Remove)",
+    "opening": "Opening Balance"
+  },
+  "purchase": "Purchase",
+  "sell": "Sell",
+  "adjust": "Adjust"
 }

@@ -29,7 +29,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         <Appbar.Action icon={paperIcon('arrow-left')} onPress={onBack} />
       )}
       <Appbar.Content title={title} subtitle={subtitle} />
-      {actions.map((action, index) => (
+      {((actions ?? []) as Action[]).map((action, index) => (
         <Appbar.Action
           key={`action-${index}`}
           icon={paperIcon(action.icon)}

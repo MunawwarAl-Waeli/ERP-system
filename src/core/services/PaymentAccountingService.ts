@@ -1,10 +1,11 @@
-import { database } from "@core/database";
-import PaymentVoucher from "@core/database/models/PaymentVoucher";
-import PaymentAllocation from "@core/database/models/PaymentAllocation";
-import ChartOfAccount from "@core/database/models/ChartOfAccount";
+import { database } from "src/database";
+import PaymentVoucher from "src/database/models/PaymentVoucher";
+import PaymentAllocation from "src/database/models/PaymentAllocation";
+import ChartOfAccount from "src/database/models/ChartOfAccount";
 import { Model, Q } from "@nozbe/watermelondb";
 import { JournalService, JournalLineInput } from "./JournalService";
 import { AccountingSettingsService } from "./AccountingSettingsService";
+import { ALLOCATABLE_TYPES } from "@core/constants";
 
 export const PaymentAccountingService = {
   getDefaultExpenseAccount: async (): Promise<string> => {
@@ -35,7 +36,7 @@ export const PaymentAccountingService = {
     // ============================================================
 
     lines.push({
-      accountId: voucher.paymentAccountId,
+      accountId: (voucher as any).paymentAccountId ?? voucher.id,
       debit: 0,
       credit: voucher.amount,
     });
@@ -60,10 +61,7 @@ export const PaymentAccountingService = {
       for (const allocation of allocations) {
         let debitAccountId: string;
 
-        if (
-          allocation.allocatableType === "purchase_invoices" ||
-          allocation.allocatableType === "purchase_invoice"
-        ) {
+        if ((allocation as any).allocatableType === ALLOCATABLE_TYPES.PURCHASE_INVOICE) {
           debitAccountId = settings.suppliersAccountId;
         } else {
           debitAccountId =
@@ -102,7 +100,7 @@ export const PaymentAccountingService = {
     // ============================================================
 
     return JournalService.prepareCreateEntry({
-      date: voucher.voucherDate,
+      entryDate: voucher.voucherDate,
       description: `سند صرف رقم: ${voucher.voucherNumber} - ${
         voucher.description || ""
       }`,
@@ -110,6 +108,7 @@ export const PaymentAccountingService = {
       referenceType: "payment_voucher",
       referenceId: voucher.id,
       createdBy: voucher.createdBy,
+      idempotencyKey: `payment-voucher:${voucher.id}`,
     });
   },
 };

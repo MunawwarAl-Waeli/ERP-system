@@ -1,0 +1,310 @@
+بالضبط. هذه الآن هي المرحلة الصحيحة: إغلاق Product/Unit بالكامل قبل لمس الـ UI.
+
+سنراجعها كـ بوابة اعتماد (Gate)، وليس كمراجعة شكلية.
+
+1. قواعد Unit
+
+يجب أن تكون القواعد النهائية:
+
+- code إلزامي.
+
+- code يتم trim + lowercase.
+
+- لا يوجد وحدتان بنفس code.
+
+- المقارنة بعد التطبيع، لذلك:
+
+  - PIECE
+  - piece
+  - piece
+
+  تعتبر نفس الوحدة.
+
+- name إلزامي بعد trim.
+
+- لا يجوز تعديل code إلى كود مستخدم لوحدة أخرى.
+
+- لا نحذف وحدة مرتبطة بمنتجات.
+
+- وحدة piece يجب أن تكون موجودة كـ وحدة النظام الأساسية.
+
+2. قاعدة قطعة / حبة
+
+هذه أهم قاعدة في المنتجات:
+
+كل Product يجب أن يحتوي بالضبط على ProductUnit
+من Unit code = "piece"
+وبـ conversionFactor = 1
+
+ولا نستخدم:
+
+isDefault
+
+ولا:
+
+units[0]
+
+لتحديد الوحدة الأساسية.
+
+بل نبحث صراحة عن:
+
+unit.code === "piece"
+
+وهذا يمنع خطأ خطير جدًا إذا تغير ترتيب الوحدات.
+
+
+---
+
+3. conversionFactor
+
+يجب أن يكون:
+
+عدد صحيح > 0
+
+أمثلة:
+
+الوحدة	معامل التحويل
+
+حبة	1
+كرتون	24
+كيس	50
+دزينة	12
+
+
+وبالتالي:
+
+2 كرتون × 24 = 48 حبة
+
+والمخزون دائمًا يخزن:
+
+48 حبة
+
+وليس 2 كرتون.
+
+
+---
+
+4. SKU
+
+القواعد:
+
+- اختياري.
+- إذا أدخله المستخدم:
+  - trim
+  - uppercase
+- يجب أن يكون فريدًا.
+- SKU فارغ بعد trim يتحول إلى undefined/null.
+- لا يجوز تحديث منتج إلى SKU مستخدم من منتج آخر.
+- البحث بـ SKU يكون exact lookup وليس LIKE.
+
+مثلاً:
+
+orange-001
+
+يتحول إلى:
+
+ORANGE-001
+
+ولا يمكن إنشاء منتجين بنفسه.
+
+
+---
+
+5. Barcode
+
+الـ Barcode مختلف عن SKU:
+
+- اختياري.
+- يجب أن يكون فريدًا على مستوى جميع ProductUnits.
+- يمكن للمنتج الواحد أن يمتلك عدة باركودات لأن له عدة وحدات.
+- لا يجوز لمنتجين/وحدتين مختلفتين امتلاك نفس Barcode.
+- البحث بالباركود يجب أن يعيد:
+  - Product
+  - ProductUnit المطابق
+
+مثال:
+
+عصير
+├── حبة      barcode: 628...
+└── كرتون    barcode: 629...
+
+عند مسح باركود الكرتون، يجب أن نعرف مباشرة أن الوحدة المختارة هي الكرتون وليس الحبة.
+
+
+---
+
+6. (product_id, unit_id)
+
+هذه قاعدة يجب ألا نتركها للـ Service فقط.
+
+يجب منع:
+
+Product A + piece
+Product A + piece
+
+لأنهما نفس ProductUnit منطقيًا.
+
+إذن نحتاج:
+
+UNIQUE(product_id, unit_id)
+
+على مستوى قاعدة البيانات أيضًا.
+
+
+---
+
+7. الـ uniqueness يجب أن يكون بثلاث طبقات
+
+هذه نقطة مهمة جدًا:
+
+Application/Service
+        ↓
+Database transaction
+        ↓
+Database unique constraint
+
+ليس:
+
+if (!exists) create()
+
+فقط.
+
+لأن هذا قد يفشل في حالة عمليتين متزامنتين:
+
+عملية A → هل SKU موجود؟ لا
+عملية B → هل SKU موجود؟ لا
+عملية A → إنشاء
+عملية B → إنشاء
+
+لذلك قاعدة البيانات نفسها يجب أن تكون خط الدفاع الأخير.
+
+
+---
+
+8. Product Service يجب أن يتحمل مسؤولية الـ Aggregate
+
+عند:
+
+createProduct()
+
+لا يكفي أن يقول:
+
+أنشئ Product
+أنشئ ProductUnits
+
+بل يجب أن يتحقق قبل الكتابة من:
+
+✓ الاسم
+✓ SKU
+✓ minStock
+✓ الحسابات
+✓ وجود الوحدات
+✓ عدم تكرار الوحدة داخل الطلب
+✓ وجود piece
+✓ piece conversion = 1
+✓ conversionFactor لكل الوحدات
+✓ عدم تكرار barcode
+✓ عدم تعارض SKU
+✓ عدم تعارض barcode
+✓ صحة unit IDs
+
+ثم:
+
+UnitOfWork
+    ↓
+create Product
+    ↓
+create ProductUnits
+
+وإذا فشل إنشاء أي ProductUnit:
+
+ROLLBACK
+
+ولا يبقى Product ناقص.
+
+
+---
+
+9. وهناك مشكلة أريد إغلاقها قبل اعتماد الكود
+
+في WatermelonProductRepository الحالي عندك:
+
+async create(...)
+
+يقوم بالكتابة مباشرة:
+
+productCollection.create(...)
+productUnitCollection.create(...)
+
+وهذا مقبول فقط إذا استدعاه ProductService داخل UnitOfWork.
+
+لكن يجب أن نتأكد أن ProductService هو الذي يملك:
+
+unitOfWork.execute(...)
+
+وليس Repository.
+
+ونفس الشيء في:
+
+update()
+
+لأن تحديث المنتج + تعديل وحداته يجب أن يكون عملية ذرية واحدة.
+
+
+---
+
+بوابة الاعتماد التي أقترحها
+
+قبل أن نقول Product/Unit جاهزان للـ UI، نريد اختبارات تغطي هذه الحالات:
+
+Unit
+
+✓ create
+✓ normalize code
+✓ duplicate code
+✓ update
+✓ update same code
+✓ update to another existing code
+✓ empty code
+✓ empty name
+
+Product
+
+✓ create with piece
+✓ create without category
+✓ reject no units
+✓ reject no piece
+✓ reject piece conversion != 1
+✓ reject duplicate unit
+✓ reject invalid conversion
+✓ reject duplicate SKU
+✓ normalize SKU
+✓ reject duplicate barcode
+✓ allow different barcodes for different units
+✓ reject duplicate barcode inside same request
+✓ update SKU collision
+✓ update barcode collision
+✓ update unit
+✓ add unit
+✓ reject foreign ProductUnit ID
+✓ atomic rollback
+
+والأهم:
+
+اختبار حقيقي:
+
+Create Product
+      ↓
+Product
+      ↓
+ProductUnit
+      ↓
+فشل إنشاء ProductUnit
+      ↓
+ROLLBACK
+      ↓
+Product غير موجود
+
+إذا نجحت هذه المجموعة، أعتبر Product/Unit Domain + Service + Repository مغلقين، وننتقل بعدها للـ UI بثقة.
+
+الخطوة الآن: أرسل لي كود ProductService وUnitService الحاليين + واجهات ProductRepository وUnitRepository الحالية، وسأراجعها مقابل هذه البوابة بندًا بندًا، ولن نكتب كودًا جديدًا قبل تحديد أي فجوة فعلية.

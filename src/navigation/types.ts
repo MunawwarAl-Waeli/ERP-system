@@ -28,6 +28,10 @@ export type SupplierStackParamList = {
 
 // ── Purchase Stack ──
 export type PurchaseStackParamList = {
+  PurchaseInvoicesList: undefined;
+  PurchaseInvoiceForm: { invoiceId?: string } | undefined;
+  PurchaseInvoiceDetail: { invoiceId: string };
+  PurchaseInvoiceEdit: { invoiceId: string };
   PurchaseForm: { purchaseId?: string } | undefined;
 };
 
@@ -43,13 +47,8 @@ export type InventoryStackParamList = {
 // ── Billing Stack ──
 export type BillingStackParamList = {
   BillingHome: undefined;
-  SalesInvoiceDetail: { billId: string };
+  SalesInvoiceDetail: { invoiceId: string };
   SalesInvoiceList: undefined;
-};
-
-// ── Expense Stack ──
-export type ExpenseStackParamList = {
-  ExpenseList: undefined;
 };
 
 // ── More (Reports + Settings) Stack ──
@@ -62,11 +61,31 @@ export type MoreStackParamList = {
   ProductPerformance: undefined;
   Settings: undefined;
   ChartOfAccounts: undefined;
+  JournalEntries: undefined;
+  JournalEntryDetails: { entryId: string };
+  GeneralLedger: { accountId?: string } | undefined;
+  TrialBalance: undefined;
+  AccountStatement: { accountId?: string } | undefined;
+  ReceiptList: undefined;
+  CreateReceipt: undefined;
+  ReceiptDetails: { voucherId: string };
+  PaymentList: undefined;
+  CreatePayment: undefined;
+  PaymentDetails: { voucherId: string };
   AccountingSettings: undefined;
   ExpenseList: undefined;
   SystemDiagnostic: undefined;
   CategoryManagement: undefined;
   UnitManagement: undefined;
+  SupplierList: undefined;
+  SupplierDetail: { supplierId: string };
+  SupplierForm: { supplierId?: string } | undefined;
+  SupplierLedger: { supplierId: string };
+  PurchaseForm: { purchaseId?: string } | undefined;
+  PurchaseInvoicesList: undefined;
+  PurchaseInvoiceForm: { invoiceId?: string } | undefined;
+  PurchaseInvoiceDetail: { invoiceId: string };
+  PurchaseInvoiceEdit: { invoiceId: string };
 };
 
 // ── Main Tab Navigator ──

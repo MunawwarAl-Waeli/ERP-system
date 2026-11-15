@@ -185,4 +185,10 @@ module.exports = {
       },
     },
   ],
+  // 
+  "no-useless-constructor": "off",
+  
+  // 2. شغّل القاعدة الذكية الخاصة بـ TS
+  "@typescript-eslint/no-useless-constructor": "error"
+
 };

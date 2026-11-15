@@ -48,7 +48,7 @@ export const MoreMenuScreen: React.FC<{ navigation: NavigationProp }> = ({
           right={(props) => (
             <List.Icon {...props} icon={paperIcon("chevron-right")} />
           )}
-          onPress={() => navigation.navigate("PurchaseForm")}
+          onPress={() => navigation.navigate("PurchaseInvoicesList")}
         />
         <Divider />
 
@@ -101,6 +101,79 @@ export const MoreMenuScreen: React.FC<{ navigation: NavigationProp }> = ({
             <List.Icon {...props} icon={paperIcon("chevron-right")} />
           )}
           onPress={() => navigation.navigate("AccountingSettings")}
+        />
+        <Divider />
+
+        <List.Item
+          title="القيود اليومية"
+          description="البحث وعرض القيود وتفاصيلها"
+          left={(props) => (
+            <List.Icon {...props} icon={paperIcon("book-open-outline")} />
+          )}
+          right={(props) => (
+            <List.Icon {...props} icon={paperIcon("chevron-right")} />
+          )}
+          onPress={() => navigation.navigate("JournalEntries")}
+        />
+        <Divider />
+        <List.Item
+          title="الأستاذ العام"
+          description="الحركات والأرصدة حسب الحساب"
+          left={(props) => (
+            <List.Icon {...props} icon={paperIcon("book-account-outline")} />
+          )}
+          right={(props) => (
+            <List.Icon {...props} icon={paperIcon("chevron-right")} />
+          )}
+          onPress={() => navigation.navigate("GeneralLedger")}
+        />
+        <Divider />
+        <List.Item
+          title="ميزان المراجعة"
+          description="إجمالي المدين والدائن والتحقق من التوازن"
+          left={(props) => (
+            <List.Icon {...props} icon={paperIcon("scale-balance")} />
+          )}
+          right={(props) => (
+            <List.Icon {...props} icon={paperIcon("chevron-right")} />
+          )}
+          onPress={() => navigation.navigate("TrialBalance")}
+        />
+        <Divider />
+        <List.Item
+          title="كشف الحساب"
+          description="الرصيد الافتتاحي والحركات والرصيد الختامي"
+          left={(props) => (
+            <List.Icon {...props} icon={paperIcon("file-document-outline")} />
+          )}
+          right={(props) => (
+            <List.Icon {...props} icon={paperIcon("chevron-right")} />
+          )}
+          onPress={() => navigation.navigate("AccountStatement")}
+        />
+        <Divider />
+        <List.Item
+          title="سندات القبض"
+          description="قائمة وإنشاء وتفاصيل سندات القبض"
+          left={(props) => (
+            <List.Icon {...props} icon={paperIcon("receipt-text-outline")} />
+          )}
+          right={(props) => (
+            <List.Icon {...props} icon={paperIcon("chevron-right")} />
+          )}
+          onPress={() => navigation.navigate("ReceiptList")}
+        />
+        <Divider />
+        <List.Item
+          title="سندات الصرف"
+          description="قائمة وإنشاء وتفاصيل سندات الصرف"
+          left={(props) => (
+            <List.Icon {...props} icon={paperIcon("cash-minus")} />
+          )}
+          right={(props) => (
+            <List.Icon {...props} icon={paperIcon("chevron-right")} />
+          )}
+          onPress={() => navigation.navigate("PaymentList")}
         />
         <Divider />
 

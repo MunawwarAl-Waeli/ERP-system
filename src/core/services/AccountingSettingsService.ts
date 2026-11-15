@@ -1,6 +1,6 @@
-import { database } from "@core/database";
-import AccountingSetting from "@core/database/models/AccountingSetting";
-import ChartOfAccount from "@core/database/models/ChartOfAccount";
+import { database } from "src/database";
+import AccountingSetting from "src/database/models/AccountingSetting";
+import ChartOfAccount from "src/database/models/ChartOfAccount";
 import { Q } from "@nozbe/watermelondb";
 
 const settingsCollection = database.get<AccountingSetting>(

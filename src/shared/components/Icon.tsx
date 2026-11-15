@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   LayoutDashboard,
   Users,
@@ -6,6 +6,7 @@ import {
   PackageOpen,
   Package,
   MoreHorizontal,
+  MoreVertical,
   TrendingUp,
   HandCoins,
   BarChart3,
@@ -13,10 +14,14 @@ import {
   ChevronDown,
   ChevronLeft,
   ArrowLeft,
+  ArrowUp,
+  ArrowDown,
   ArrowUpDown,
   Tag,
   Barcode,
   AlertCircle,
+  AlertTriangle,
+  Info,
   Phone,
   MapPin,
   StickyNote,
@@ -36,18 +41,19 @@ import {
   Smartphone,
   CreditCard,
   Clock,
+  Calendar,
   History,
   Trash2,
   ShoppingCart,
   User,
   Check,
   Pencil,
+  Percent,
   Share2,
   Bluetooth,
   CheckCircle2,
   Eye,
   EyeOff,
-  FileText,
   Cloud,
   LogIn,
   LogOut,
@@ -68,7 +74,6 @@ import {
   Drumstick,
   Container,
   type LucideProps,
-  FolderOpen,
   Folder,
   PlusCircle,
   Landmark,
@@ -77,9 +82,21 @@ import {
   TrendingDown,
   Square,
   MinusSquare,
+  ReceiptText,
+  FolderOpen,
+  FileText,
+  Truck,
+  Calculator,
+  BookOpen,
+  BookUser,
+  ArrowDownUp,
+  WalletCards,
+  ShieldCheck,
+  Network,
+  Wallet,
 } from "lucide-react-native";
 
-// Map from MaterialCommunityIcons names → Lucide components
+// Map from MaterialCommunityIcons names â†’ Lucide components
 const iconMap: Record<string, React.FC<LucideProps>> = {
   // Navigation
   "view-dashboard": LayoutDashboard,
@@ -88,6 +105,9 @@ const iconMap: Record<string, React.FC<LucideProps>> = {
   "package-variant-closed": PackageOpen,
   "package-variant": Package,
   "dots-horizontal": MoreHorizontal,
+  "dots-vertical": MoreVertical,
+  "more-vertical": MoreVertical,
+  "dots-vertical-circle": MoreVertical,
 
   // Dashboard / Reports
   "chart-line": TrendingUp,
@@ -97,16 +117,35 @@ const iconMap: Record<string, React.FC<LucideProps>> = {
   "chevron-down": ChevronDown,
   "chevron-left": ChevronLeft,
   "arrow-left": ArrowLeft,
+  "arrow-up": ArrowUp,
+  "arrow-down": ArrowDown,
   "arrow-up-down": ArrowUpDown,
   sort: ArrowUpDown,
   "menu-down": ChevronDown,
+  // More Menu
+  "truck-delivery": Truck,
+  "cart-plus": ShoppingCart,
+  "vector-arrange-after": ArrowDownUp,
+  calculator: Calculator,
+  "book-open-outline": BookOpen,
+  "book-account-outline": BookUser,
 
+  // Accounting documents
+  "file-document-outline": FileText,
+  "receipt-text-outline": ReceiptText,
+  "cash-minus": WalletCards,
+
+  // Management
+  "folder-outline": FolderOpen,
+  "shield-check-outline": ShieldCheck,
   // Products
   tag: Tag,
   barcode: Barcode,
 
   // Alerts
   "alert-circle": AlertCircle,
+  "alert-triangle": AlertTriangle,
+  info: Info,
 
   // Customers
   phone: Phone,
@@ -136,6 +175,8 @@ const iconMap: Record<string, React.FC<LucideProps>> = {
   delete: Trash2,
   "trash-2": Trash2,
   pencil: Pencil,
+  percent: Percent,
+  "percent-outline": Percent,
   check: Check,
 
   // Billing
@@ -145,6 +186,8 @@ const iconMap: Record<string, React.FC<LucideProps>> = {
   cellphone: Smartphone,
   "credit-card": CreditCard,
   "account-clock": Clock,
+  calendar: Calendar,
+  "calendar-outline": Calendar,
   "cart-outline": ShoppingCart,
   account: User,
   user: User,
@@ -198,18 +241,28 @@ const iconMap: Record<string, React.FC<LucideProps>> = {
 
   // Accounting
   "plus-circle": PlusCircle,
-  // 'pencil': Pencil,
-  "pencil-outline": Pencil, // مترادف
+  "pencil-outline": Pencil,
+
   folder: Folder,
-  landmark: Landmark, // بديل bank
-  scale: Scale, // ميزان للخصوم
-  "scale-balance": Scale, // مترادف للحفاظ على التوافق
-  shield: Shield, // درع لحقوق الملكية
-  "shield-account": Shield, // مترادف
+
+  landmark: Landmark,
+
+  scale: Scale,
+  "scale-balance": Scale,
+
+  shield: Shield,
+  "shield-account": Shield,
+
   "trending-down": TrendingDown,
-  square: Square, // مربع فارغ للـ checkbox
-  "checkbox-blank": Square, // مترادف
-  "minus-square": MinusSquare, // لاحقًا لو احتجنا
+
+  square: Square,
+  "checkbox-blank": Square,
+  "minus-square": MinusSquare,
+  // Accounting form
+  "wallet-outline": Wallet,
+  "credit-card-outline": CreditCard,
+  "trending-up": TrendingUp,
+  sitemap: Network,
 };
 
 export interface AppIconProps {
@@ -221,7 +274,7 @@ export interface AppIconProps {
 
 /**
  * Drop-in replacement for react-native-vector-icons Icon.
- * Uses Lucide SVG icons — no native font linking needed.
+ * Uses Lucide SVG icons â€” no native font linking needed.
  */
 export const AppIcon: React.FC<AppIconProps> = ({
   name,
@@ -246,3 +299,5 @@ export const paperIcon = (name: string) => {
     <AppIcon name={name} size={size} color={color} />
   );
 };
+
+
