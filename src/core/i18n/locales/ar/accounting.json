@@ -50,5 +50,10 @@
   "saveSettings": "حفظ الإعدادات",
   "settingsSaved": "تم حفظ الإعدادات المحاسبية بنجاح",
   "selectAccount": "اختر الحساب...",
-  "searchAccountPlaceholder": "ابحث عن حساب بالاسم أو الرمز..."
+  "searchAccountPlaceholder": "ابحث عن حساب بالاسم أو الرمز...",
+  "noSearchResults": "لا توجد نتائج",
+  "noSearchResultsDescription": "لم يتم العثور على حسابات تطابق بحثك",
+  "errorLoadingAccounts": "تعذر تحميل دليل الحسابات",
+  "refreshFailed": "فشل تحديث البيانات",
+  "saveAccountError": "حدث خطأ أثناء حفظ الحساب. يرجى المحاولة مرة أخرى."
 }

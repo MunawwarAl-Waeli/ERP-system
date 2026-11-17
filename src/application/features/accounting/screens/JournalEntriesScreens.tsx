@@ -1,5 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, ScrollView, StyleSheet, View } from "react-native";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  View,
+  Platform,
+  TouchableOpacity,
+} from "react-native";
 import {
   Button,
   Card,
@@ -9,12 +16,15 @@ import {
   Text,
   TextInput,
   useTheme,
+  Chip,
 } from "react-native-paper";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppHeader } from "@shared/components/AppHeader";
 import { EmptyState } from "@shared/components/EmptyState";
 import { LoadingOverlay } from "@shared/components/LoadingOverlay";
 import { CurrencyText } from "@shared/components/CurrencyText";
+import { AppIcon } from "@shared/components/Icon";
 import { useAccounts } from "../hooks/useAccountingData";
 import {
   JournalEntryDetails,
@@ -36,12 +46,6 @@ type AccountRoute = { params: { accountId?: string } };
 const formatDate = (value: number): string =>
   new Date(value).toLocaleDateString("ar-EG");
 
-const parseDate = (value: string): Date | undefined => {
-  if (!value.trim()) return undefined;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-};
-
 const ScreenError: React.FC<{ message: string; onRetry: () => void }> = ({
   message,
   onRetry,
@@ -54,14 +58,21 @@ const ScreenError: React.FC<{ message: string; onRetry: () => void }> = ({
   </View>
 );
 
+// ==========================================
+// 1. شاشة قائمة القيود اليومية
+// ==========================================
 export const JournalEntriesScreen: React.FC<{ navigation: NavigationProp }> = ({
   navigation,
 }) => {
   const theme = useTheme();
   const [entries, setEntries] = useState<JournalEntrySummary[]>([]);
   const [search, setSearch] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
+  const [toDate, setToDate] = useState<Date | undefined>(undefined);
+
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,11 +81,7 @@ export const JournalEntriesScreen: React.FC<{ navigation: NavigationProp }> = ({
     setError(null);
     try {
       setEntries(
-        await reportService.getJournalEntries(
-          search,
-          parseDate(from),
-          parseDate(to),
-        ),
+        await reportService.getJournalEntries(search, fromDate, toDate),
       );
     } catch (value) {
       setError(
@@ -83,7 +90,7 @@ export const JournalEntriesScreen: React.FC<{ navigation: NavigationProp }> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [from, search, to]);
+  }, [fromDate, search, toDate]);
 
   useEffect(() => {
     void load();
@@ -102,32 +109,79 @@ export const JournalEntriesScreen: React.FC<{ navigation: NavigationProp }> = ({
         showBack
         onBack={() => navigation.goBack()}
       />
-      <View style={styles.filters}>
+
+      <View style={[styles.filters, { backgroundColor: theme.colors.surface }]}>
         <Searchbar
-          placeholder="بحث في البيان أو المرجع"
+          placeholder="بحث في البيان أو المرجع..."
           value={search}
           onChangeText={setSearch}
+          style={{
+            marginBottom: 8,
+            backgroundColor: theme.colors.surfaceVariant,
+          }}
+          inputStyle={{ fontSize: 14 }}
         />
+
         <View style={styles.row}>
-          <TextInput
-            label="من تاريخ"
-            value={from}
-            onChangeText={setFrom}
-            placeholder="YYYY-MM-DD"
-            style={styles.dateInput}
-          />
-          <TextInput
-            label="إلى تاريخ"
-            value={to}
-            onChangeText={setTo}
-            placeholder="YYYY-MM-DD"
-            style={styles.dateInput}
-          />
+          <TouchableOpacity
+            style={[styles.dateBtn, { borderColor: theme.colors.outline }]}
+            onPress={() => setShowFromPicker(true)}
+          >
+            <AppIcon name="calendar" size={16} color={theme.colors.primary} />
+            <Text variant="bodySmall" style={{ marginLeft: 4 }}>
+              {fromDate ? formatDate(fromDate.getTime()) : "من تاريخ"}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.dateBtn, { borderColor: theme.colors.outline }]}
+            onPress={() => setShowToPicker(true)}
+          >
+            <AppIcon name="calendar" size={16} color={theme.colors.primary} />
+            <Text variant="bodySmall" style={{ marginLeft: 4 }}>
+              {toDate ? formatDate(toDate.getTime()) : "إلى تاريخ"}
+            </Text>
+          </TouchableOpacity>
         </View>
-        <Button mode="outlined" onPress={() => void load()}>
-          تحديث
-        </Button>
+
+        {(fromDate || toDate || search) && (
+          <Button
+            mode="text"
+            compact
+            onPress={() => {
+              setFromDate(undefined);
+              setToDate(undefined);
+              setSearch("");
+            }}
+          >
+            مسح الفلاتر
+          </Button>
+        )}
       </View>
+
+      {showFromPicker && (
+        <DateTimePicker
+          value={fromDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={(e, date) => {
+            setShowFromPicker(Platform.OS === "ios");
+            if (date) setFromDate(date);
+          }}
+        />
+      )}
+      {showToPicker && (
+        <DateTimePicker
+          value={toDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={(e, date) => {
+            setShowToPicker(Platform.OS === "ios");
+            if (date) setToDate(date);
+          }}
+        />
+      )}
+
       {entries.length === 0 ? (
         <EmptyState
           icon="book-open-outline"
@@ -141,42 +195,141 @@ export const JournalEntriesScreen: React.FC<{ navigation: NavigationProp }> = ({
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <Card
-              mode="outlined"
-              style={styles.card}
+              mode="elevated"
+              style={[
+                styles.card,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderRadius: 12,
+                  elevation: 2,
+                },
+              ]}
               onPress={() =>
                 navigation.navigate("JournalEntryDetails", { entryId: item.id })
               }
             >
-              <Card.Content>
-                <View style={styles.rowBetween}>
-                  <Text variant="titleMedium">#{item.id.slice(0, 8)}</Text>
-                  <Text>{formatDate(item.entryDate)}</Text>
-                </View>
-                <Text>{item.description || "بدون بيان"}</Text>
-                <Text style={styles.muted}>
-                  {item.referenceType || "بدون مرجع"} {item.referenceId || ""}
-                </Text>
-                <View style={styles.rowBetween}>
-                  <CurrencyText
-                    amount={item.totalDebit}
-                    color={theme.colors.primary}
-                  />
-                  <CurrencyText
-                    amount={item.totalCredit}
-                    color={theme.colors.tertiary}
-                  />
-                  <Text
+              <View style={{ padding: 12 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  <View
                     style={{
-                      color:
-                        Math.abs(item.totalDebit - item.totalCredit) < 0.001
-                          ? theme.colors.primary
-                          : theme.colors.error,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
                     }}
                   >
-                    {item.status}
-                  </Text>
+                    <View
+                      style={{
+                        backgroundColor: theme.colors.primaryContainer,
+                        padding: 6,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <AppIcon
+                        name="book-open-page-variant"
+                        size={18}
+                        color={theme.colors.primary}
+                      />
+                    </View>
+                    <View>
+                      <Text variant="titleSmall" style={{ fontWeight: "bold" }}>
+                        قيد #{item.id.slice(0, 6)}
+                      </Text>
+                      <Text
+                        variant="labelSmall"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        {formatDate(item.entryDate)}
+                      </Text>
+                    </View>
+                  </View>
+                  <Chip
+                    compact
+                    textStyle={{
+                      fontSize: 10,
+                      color: theme.colors.onSecondaryContainer,
+                    }}
+                    style={{ backgroundColor: theme.colors.secondaryContainer }}
+                  >
+                    {item.status === "posted" ? "مرحل" : item.status}
+                  </Chip>
                 </View>
-              </Card.Content>
+
+                <Text
+                  variant="bodyMedium"
+                  style={{ marginBottom: 12, color: theme.colors.onSurface }}
+                  numberOfLines={2}
+                >
+                  {item.description || "بدون بيان"}
+                </Text>
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderTopWidth: 1,
+                    borderTopColor: theme.colors.surfaceVariant,
+                    paddingTop: 10,
+                  }}
+                >
+                  <View
+                    style={{
+                      flex: 1,
+                      backgroundColor: theme.colors.surfaceVariant,
+                      padding: 8,
+                      borderRadius: 8,
+                      marginRight: 8,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      variant="labelSmall"
+                      style={{
+                        color: theme.colors.primary,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      مدين
+                    </Text>
+                    <CurrencyText
+                      amount={item.totalDebit}
+                      color={theme.colors.primary}
+                    />
+                  </View>
+
+                  <View
+                    style={{
+                      flex: 1,
+                      backgroundColor: theme.colors.surfaceVariant,
+                      padding: 8,
+                      borderRadius: 8,
+                      marginLeft: 8,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      variant="labelSmall"
+                      style={{
+                        color: theme.colors.tertiary,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      دائن
+                    </Text>
+                    <CurrencyText
+                      amount={item.totalCredit}
+                      color={theme.colors.tertiary}
+                    />
+                  </View>
+                </View>
+              </View>
             </Card>
           )}
         />
@@ -185,6 +338,9 @@ export const JournalEntriesScreen: React.FC<{ navigation: NavigationProp }> = ({
   );
 };
 
+// ==========================================
+// 2. شاشة تفاصيل القيد (تم تحويلها لجدول)
+// ==========================================
 export const JournalEntryDetailsScreen: React.FC<{
   navigation: NavigationProp;
   route: JournalRoute;
@@ -195,12 +351,17 @@ export const JournalEntryDetailsScreen: React.FC<{
   const [isLoading, setIsLoading] = useState(true);
 
   const load = useCallback(async () => {
+    const entryId = route?.params?.entryId;
+    if (!entryId) {
+      setError("معرف القيد غير صالح.");
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
-      setDetails(
-        await reportService.getJournalEntryDetails(route.params.entryId),
-      );
+      setDetails(await reportService.getJournalEntryDetails(entryId));
     } catch (value) {
       setError(
         value instanceof Error ? value.message : "تعذر تحميل تفاصيل القيد.",
@@ -208,19 +369,32 @@ export const JournalEntryDetailsScreen: React.FC<{
     } finally {
       setIsLoading(false);
     }
-  }, [route.params.entryId]);
+  }, [route?.params?.entryId]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
   if (isLoading) return <LoadingOverlay visible />;
-  if (error || !details)
+  if (error || !details) {
     return (
-      <ScreenError
-        message={error ?? "القيد غير موجود."}
-        onRetry={() => void load()}
-      />
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+        edges={["top"]}
+      >
+        <AppHeader
+          title="تفاصيل القيد"
+          showBack
+          onBack={() => navigation.goBack()}
+        />
+        <ScreenError
+          message={error ?? "القيد غير موجود."}
+          onRetry={() => void load()}
+        />
+      </SafeAreaView>
     );
+  }
+
   const balanced = Math.abs(details.totalDebit - details.totalCredit) < 0.001;
 
   return (
@@ -233,60 +407,194 @@ export const JournalEntryDetailsScreen: React.FC<{
         showBack
         onBack={() => navigation.goBack()}
       />
+
       <ScrollView contentContainerStyle={styles.list}>
-        <Card mode="outlined" style={styles.card}>
+        <Card mode="elevated" style={{ marginBottom: 12 }}>
           <Card.Content>
-            <Text variant="titleLarge">قيد #{details.id.slice(0, 8)}</Text>
-            <Text>التاريخ: {formatDate(details.entryDate)}</Text>
-            <Text>البيان: {details.description || "بدون بيان"}</Text>
-            <Text>المصدر: {details.referenceType || "غير محدد"}</Text>
-            <Text>المرجع: {details.referenceId || "غير محدد"}</Text>
-            <Text>المنشئ: {details.createdBy || "غير محدد"}</Text>
-            <Text>الحالة: {details.status}</Text>
+            <View style={styles.rowBetween}>
+              <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
+                قيد #{details.id.slice(0, 8)}
+              </Text>
+              <Chip compact>{details.status}</Chip>
+            </View>
+            <Divider style={{ marginVertical: 8 }} />
+            <Text variant="bodyMedium">
+              التاريخ: {formatDate(details.entryDate)}
+            </Text>
+            <Text variant="bodyMedium">
+              البيان: {details.description || "بدون بيان"}
+            </Text>
+            <Text variant="bodyMedium">
+              المصدر: {details.referenceType || "غير محدد"}
+            </Text>
             {details.isReversed && (
-              <Text style={styles.warning}>هذا القيد تم عكسه.</Text>
+              <Text
+                style={{
+                  color: theme.colors.error,
+                  marginTop: 8,
+                  fontWeight: "bold",
+                }}
+              >
+                ⚠️ هذا القيد تم عكسه
+              </Text>
             )}
           </Card.Content>
         </Card>
-        <Card mode="outlined" style={styles.card}>
-          <Card.Title title="سطور القيد" />
-          <Card.Content>
-            {details.lines.map((line) => (
-              <View key={line.id} style={styles.line}>
-                <View style={styles.flex}>
-                  <Text>
-                    {line.accountCode} — {line.accountName}
+
+        <Card mode="elevated">
+          <Card.Title title="سطور القيد" titleStyle={{ fontSize: 16 }} />
+          <Card.Content style={{ paddingHorizontal: 0 }}>
+            {/* ✅ الجدول هنا مع سكرول أفقي */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+              <View style={{ minWidth: "100%", paddingBottom: 10 }}>
+                {/* رأس الجدول */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    backgroundColor: theme.colors.surfaceVariant,
+                    padding: 10,
+                    borderRadius: 8,
+                    marginBottom: 8,
+                    marginHorizontal: 12,
+                  }}
+                >
+                  <Text
+                    style={{
+                      width: 40,
+                      textAlign: "center",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    #
+                  </Text>
+                  <Text
+                    style={{
+                      width: 160,
+                      textAlign: "right",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    الحساب
+                  </Text>
+                  <Text
+                    style={{
+                      width: 90,
+                      textAlign: "center",
+                      fontWeight: "bold",
+                      color: theme.colors.primary,
+                    }}
+                  >
+                    مدين
+                  </Text>
+                  <Text
+                    style={{
+                      width: 90,
+                      textAlign: "center",
+                      fontWeight: "bold",
+                      color: theme.colors.tertiary,
+                    }}
+                  >
+                    دائن
                   </Text>
                 </View>
-                <CurrencyText amount={line.debit} />
+
+                {/* صفوف الجدول */}
+                {details.lines.map((line, index) => (
+                  <View
+                    key={line.id}
+                    style={{
+                      flexDirection: "row",
+                      paddingVertical: 10,
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.colors.surfaceVariant,
+                      marginHorizontal: 12,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        width: 40,
+                        textAlign: "center",
+                        color: theme.colors.onSurfaceVariant,
+                      }}
+                    >
+                      {index + 1}
+                    </Text>
+                    <View style={{ width: 160, paddingRight: 4 }}>
+                      <Text
+                        style={{ fontWeight: "bold", textAlign: "right" }}
+                        numberOfLines={1}
+                      >
+                        {line.accountName}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: theme.colors.onSurfaceVariant,
+                          textAlign: "right",
+                        }}
+                      >
+                        {line.accountCode}
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        width: 90,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color:
+                          line.debit > 0
+                            ? theme.colors.primary
+                            : theme.colors.onSurfaceVariant,
+                      }}
+                    >
+                      {line.debit > 0 ? line.debit.toFixed(2) : "-"}
+                    </Text>
+                    <Text
+                      style={{
+                        width: 90,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color:
+                          line.credit > 0
+                            ? theme.colors.tertiary
+                            : theme.colors.onSurfaceVariant,
+                      }}
+                    >
+                      {line.credit > 0 ? line.credit.toFixed(2) : "-"}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+
+            <Divider style={{ marginVertical: 12, marginHorizontal: 12 }} />
+
+            <View style={{ marginHorizontal: 12 }}>
+              <View style={styles.rowBetween}>
+                <Text style={{ fontWeight: "bold" }}>إجمالي المدين</Text>
                 <CurrencyText
-                  amount={line.credit}
+                  amount={details.totalDebit}
+                  color={theme.colors.primary}
+                />
+              </View>
+              <View style={styles.rowBetween}>
+                <Text style={{ fontWeight: "bold" }}>إجمالي الدائن</Text>
+                <CurrencyText
+                  amount={details.totalCredit}
                   color={theme.colors.tertiary}
                 />
               </View>
-            ))}
-            <Divider />
-            <View style={styles.rowBetween}>
-              <Text>إجمالي المدين</Text>
-              <CurrencyText amount={details.totalDebit} />
+              <Text
+                style={[
+                  styles.balanceNotice,
+                  {
+                    color: balanced ? theme.colors.primary : theme.colors.error,
+                  },
+                ]}
+              >
+                {balanced ? "✅ القيد متوازن" : "⚠️ تحذير: القيد غير متوازن"}
+              </Text>
             </View>
-            <View style={styles.rowBetween}>
-              <Text>إجمالي الدائن</Text>
-              <CurrencyText
-                amount={details.totalCredit}
-                color={theme.colors.tertiary}
-              />
-            </View>
-            <Text
-              style={[
-                styles.balanceNotice,
-                { color: balanced ? theme.colors.primary : theme.colors.error },
-              ]}
-            >
-              {balanced
-                ? "القيد متوازن: المدين = الدائن"
-                : "تحذير: القيد غير متوازن"}
-            </Text>
           </Card.Content>
         </Card>
       </ScrollView>
@@ -294,6 +602,9 @@ export const JournalEntryDetailsScreen: React.FC<{
   );
 };
 
+// ==========================================
+// 3. بقية الشاشات (الأستاذ العام، ميزان المراجعة، إلخ)
+// ==========================================
 const AccountMenu: React.FC<{
   accounts: ChartOfAccount[];
   selected: ChartOfAccount | null;
@@ -311,7 +622,7 @@ const AccountMenu: React.FC<{
       }
     >
       <ScrollView style={styles.menuScroll}>
-        {accounts.map((account) => (
+        {(accounts || []).map((account) => (
           <Menu.Item
             key={account.id}
             title={`${account.code} — ${account.name}`}
@@ -340,15 +651,17 @@ const AccountReportScreen: React.FC<{
   const { accounts, isLoading: accountsLoading } = useAccounts();
   const initialId = route?.params?.accountId;
   const [selected, setSelected] = useState<ChartOfAccount | null>(null);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
+  const [toDate, setToDate] = useState<Date | undefined>(undefined);
   const [report, setReport] = useState<LedgerReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialId)
-      setSelected(accounts.find((account) => account.id === initialId) ?? null);
+      setSelected(
+        (accounts || []).find((account) => account.id === initialId) ?? null,
+      );
   }, [accounts, initialId]);
 
   const load = useCallback(async () => {
@@ -356,13 +669,13 @@ const AccountReportScreen: React.FC<{
     setIsLoading(true);
     setError(null);
     try {
-      setReport(await loadReport(selected.id, parseDate(from), parseDate(to)));
+      setReport(await loadReport(selected.id, fromDate, toDate));
     } catch (value) {
       setError(value instanceof Error ? value.message : "تعذر تحميل التقرير.");
     } finally {
       setIsLoading(false);
     }
-  }, [from, loadReport, selected, to]);
+  }, [fromDate, loadReport, selected, toDate]);
 
   const rows = useMemo(() => report?.rows ?? [], [report]);
   return (
@@ -381,18 +694,19 @@ const AccountReportScreen: React.FC<{
             onSelect={setSelected}
           />
         )}
+
         <View style={styles.row}>
           <TextInput
             label="من تاريخ"
-            value={from}
-            onChangeText={setFrom}
+            value={fromDate ? fromDate.toISOString().slice(0, 10) : ""}
+            onChangeText={() => {}}
             placeholder="YYYY-MM-DD"
             style={styles.dateInput}
           />
           <TextInput
             label="إلى تاريخ"
-            value={to}
-            onChangeText={setTo}
+            value={toDate ? toDate.toISOString().slice(0, 10) : ""}
+            onChangeText={() => {}}
             placeholder="YYYY-MM-DD"
             style={styles.dateInput}
           />
@@ -433,9 +747,6 @@ const AccountReportScreen: React.FC<{
                     <Text>
                       {formatDate(row.date)} — {row.description || "بدون بيان"}
                     </Text>
-                    <Text style={styles.muted}>
-                      {row.referenceType || ""} {row.referenceId || ""}
-                    </Text>
                     <View style={styles.rowBetween}>
                       <CurrencyText amount={row.debit} />
                       <CurrencyText
@@ -465,6 +776,7 @@ export const GeneralLedgerScreen: React.FC<{
     loadReport={reportService.getGeneralLedger}
   />
 );
+
 export const AccountStatementScreen: React.FC<{
   navigation: NavigationProp;
   route?: AccountRoute;
@@ -570,29 +882,34 @@ export const TrialBalanceScreen: React.FC<{ navigation: NavigationProp }> = ({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  filters: { padding: 12, gap: 8 },
-  list: { padding: 12, gap: 10 },
-  card: { marginBottom: 8 },
+  filters: {
+    padding: 12,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    elevation: 2,
+    marginBottom: 8,
+  },
+  list: { padding: 12, gap: 10, paddingBottom: 30 },
+  card: { marginBottom: 8, borderRadius: 12 },
   row: { flexDirection: "row", gap: 8 },
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: 8,
     marginTop: 8,
   },
-  dateInput: { flex: 1, backgroundColor: "transparent" },
-  muted: { color: "#6B7280", marginTop: 4 },
-  error: { color: "#B42318", marginBottom: 12, textAlign: "center" },
-  warning: { color: "#B54708", marginTop: 8 },
-  balanceNotice: { fontWeight: "700", marginTop: 12, textAlign: "center" },
-  line: {
+  dateBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
+    justifyContent: "center",
+    padding: 10,
+    borderWidth: 1,
+    borderRadius: 8,
   },
-  flex: { flex: 1 },
+  dateInput: { flex: 1, backgroundColor: "transparent" },
+  error: { color: "#B42318", marginBottom: 12, textAlign: "center" },
+  balanceNotice: { fontWeight: "700", marginTop: 12, textAlign: "center" },
   centered: {
     flex: 1,
     alignItems: "center",

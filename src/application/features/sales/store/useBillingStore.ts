@@ -1,4 +1,4 @@
-import { create } from "zustand";
+﻿import { create } from "zustand";
 import { CartItem } from "@core/types";
 
 interface BillingState {
@@ -36,7 +36,7 @@ interface BillingState {
   clearCart: () => void;
 }
 
-// دوال مساعدة للحسابات
+// Ø¯ÙˆØ§Ù„ Ù…Ø³Ø§Ø¹Ø¯Ø© Ù„Ù„Ø­Ø³Ø§Ø¨Ø§Øª
 const calculateItemTotal = (item: CartItem): number =>
   item.quantity * item.unitPrice - item.discount;
 
@@ -45,24 +45,24 @@ const recalculateTotals = (
   discountTotal: number,
   serviceFee: number,
 ) => {
-  const subtotal = cartItems.reduce((sum, item) => sum + item.total, 0);
-  const grandTotal = Math.max(0, subtotal - discountTotal + serviceFee);
+  const subtotal = Math.round(cartItems.reduce((sum, item) => sum + item.total, 0));
+  const grandTotal = Math.max(0, Math.round(subtotal - discountTotal + serviceFee));
   return { subtotal, grandTotal };
 };
 
 export const useBillingStore = create<BillingState>((set, get) => ({
-  // ========== الحالة الأولية ==========
+  // ========== Ø§Ù„Ø­Ø§Ù„Ø© Ø§Ù„Ø£ÙˆÙ„ÙŠØ© ==========
   cartItems: [],
   selectedCustomerId: null,
   paymentType: "cash",
   partialPaidAmount: 0,
   discountTotal: 0,
-  serviceFee: 0, // 👈 إضافة القيمة الأولية
+  serviceFee: 0, // ðŸ‘ˆ Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù‚ÙŠÙ…Ø© Ø§Ù„Ø£ÙˆÙ„ÙŠØ©
   notes: "",
   subtotal: 0,
   grandTotal: 0,
 
-  // ========== الإجراءات ==========
+  // ========== Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª ==========
 
   addToCart: (item) => {
     const state = get();
@@ -99,7 +99,7 @@ export const useBillingStore = create<BillingState>((set, get) => ({
       newItems,
       state.discountTotal,
       state.serviceFee,
-    ); // 👈 تمرير serviceFee
+    ); // ðŸ‘ˆ ØªÙ…Ø±ÙŠØ± serviceFee
     set({ cartItems: newItems, ...totals });
   },
 
@@ -118,7 +118,7 @@ export const useBillingStore = create<BillingState>((set, get) => ({
       newItems,
       state.discountTotal,
       state.serviceFee,
-    ); // 👈 تمرير serviceFee
+    ); // ðŸ‘ˆ ØªÙ…Ø±ÙŠØ± serviceFee
     set({ cartItems: newItems, ...totals });
   },
 
@@ -137,7 +137,7 @@ export const useBillingStore = create<BillingState>((set, get) => ({
       newItems,
       state.discountTotal,
       state.serviceFee,
-    ); // 👈 تمرير serviceFee
+    ); // ðŸ‘ˆ ØªÙ…Ø±ÙŠØ± serviceFee
     set({ cartItems: newItems, ...totals });
   },
 
@@ -151,7 +151,7 @@ export const useBillingStore = create<BillingState>((set, get) => ({
       newItems,
       state.discountTotal,
       state.serviceFee,
-    ); // 👈 تمرير serviceFee
+    ); // ðŸ‘ˆ ØªÙ…Ø±ÙŠØ± serviceFee
     set({ cartItems: newItems, ...totals });
   },
 
@@ -167,11 +167,11 @@ export const useBillingStore = create<BillingState>((set, get) => ({
       state.cartItems,
       discount,
       state.serviceFee,
-    ); // 👈 تمرير serviceFee
+    ); // ðŸ‘ˆ ØªÙ…Ø±ÙŠØ± serviceFee
     set({ discountTotal: discount, ...totals });
   },
 
-  // 👈 تنفيذ دالة أجور الخدمات
+  // ðŸ‘ˆ ØªÙ†ÙÙŠØ° Ø¯Ø§Ù„Ø© Ø£Ø¬ÙˆØ± Ø§Ù„Ø®Ø¯Ù…Ø§Øª
   setServiceFee: (fee) => {
     const state = get();
     const totals = recalculateTotals(state.cartItems, state.discountTotal, fee);
@@ -185,6 +185,7 @@ export const useBillingStore = create<BillingState>((set, get) => ({
       cartItems: [],
       selectedCustomerId: null,
       paymentType: "cash",
+      partialPaidAmount: 0, // ✅ تصفير المبلغ الجزئي
       discountTotal: 0,
       serviceFee: 0,
       notes: "",
@@ -192,3 +193,5 @@ export const useBillingStore = create<BillingState>((set, get) => ({
       grandTotal: 0,
     }),
 }));
+
+

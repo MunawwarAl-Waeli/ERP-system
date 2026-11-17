@@ -1,106 +1,268 @@
 ﻿import React from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
-import { Text, useTheme, IconButton, Avatar } from "react-native-paper";
-import { useTranslation } from "react-i18next";
+import { StyleSheet, View, Pressable } from "react-native";
+import { Text, Surface, Checkbox } from "react-native-paper";
+import { AppIcon } from "src/shared/components/Icon";
+import { Colors } from "src/core/theme/colors";
 
 interface CustomerCardProps {
   name: string;
   phone?: string;
   outstandingCredit?: number;
+  isSelectionMode?: boolean;
+  isSelected?: boolean;
   onPress: () => void;
   onCall?: () => void;
+  onWhatsapp?: () => void;
+  onSms?: () => void;
+  onPdf?: () => void;
 }
 
-export const CustomerCard: React.FC<CustomerCardProps> = ({
-  name,
-  phone,
-  outstandingCredit = 0,
-  onPress,
-  onCall,
-}) => {
-  const theme = useTheme();
-  const { t } = useTranslation("customers");
-  const firstLetter = name ? name.charAt(0).toUpperCase() : "?";
+export const CustomerCard: React.FC<CustomerCardProps> = React.memo(
+  ({
+    name,
+    phone,
+    outstandingCredit = 0,
+    isSelectionMode = false,
+    isSelected = false,
+    onPress,
+    onCall,
+    onWhatsapp,
+    onSms,
+    onPdf,
+  }) => {
+    const hasDebt = outstandingCredit > 0;
 
-  return (
-    <TouchableOpacity
-      style={[styles.card, { backgroundColor: theme.colors.surface }]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <View style={styles.contentRow}>
-        <Avatar.Text
-          size={48}
-          label={firstLetter}
-          style={{ backgroundColor: theme.colors.primaryContainer }}
-          color={theme.colors.primary}
-        />
-        
-        <View style={styles.infoContainer}>
-          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }} numberOfLines={1}>
-            {name}
-          </Text>
-          {phone ? (
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              {phone}
-            </Text>
-          ) : null}
-          
-          <View style={styles.balanceRow}>
-            <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              {t("totalRequired", "المطلوب")}: 
-            </Text>
-            <Text
-              variant="titleSmall"
-              style={{
-                color: outstandingCredit > 0 ? theme.colors.error : theme.colors.primary,
-                fontWeight: "bold",
-                marginLeft: 4,
-              }}
+    const formattedBalance = outstandingCredit.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+
+    const avatarLetter = name.trim().charAt(0) || "ع";
+
+    return (
+      <Surface
+        style={[
+          styles.card,
+          {
+            backgroundColor: Colors.surface,
+            borderColor: isSelected ? Colors.primary : Colors.border,
+            borderWidth: isSelected ? 1.5 : 1,
+          },
+        ]}
+        elevation={0}
+      >
+        <Pressable
+          onPress={onPress}
+          android_ripple={{ color: "rgba(0,0,0,0.03)" }}
+          style={styles.cardInner}
+        >
+          {/* الصف الرئيسي */}
+          <View style={styles.topRow}>
+            {isSelectionMode && (
+              <View style={styles.checkboxContainer}>
+                <Checkbox
+                  status={isSelected ? "checked" : "unchecked"}
+                  onPress={onPress}
+                  color={Colors.primary}
+                />
+              </View>
+            )}
+
+            <View
+              style={[
+                styles.avatar,
+                {
+                  backgroundColor: hasDebt ? Colors.errorBg : Colors.surfaceVariant,
+                },
+              ]}
             >
-              {outstandingCredit > 0 ? outstandingCredit.toLocaleString() : "0"}
-            </Text>
-          </View>
-        </View>
+              <Text
+                style={[
+                  styles.avatarText,
+                  { color: hasDebt ? Colors.creditRed : Colors.onSurfaceVariant },
+                ]}
+              >
+                {avatarLetter}
+              </Text>
+            </View>
 
-        {onCall && phone ? (
-          <IconButton
-            icon="phone"
-            size={20}
-            iconColor={theme.colors.primary}
-            onPress={onCall}
-            style={{ margin: 0 }}
-          />
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
-};
+            <View style={styles.infoCol}>
+              <Text style={[styles.customerName, { color: Colors.onSurface }]} numberOfLines={1}>
+                {name}
+              </Text>
+              {phone ? (
+                <View style={styles.phoneRow}>
+                  <AppIcon name="phone" size={12} color={Colors.onSurfaceVariant} />
+                  <Text
+                    style={[
+                      styles.phoneText,
+                      { color: Colors.onSurfaceVariant, writingDirection: "ltr" },
+                    ]}
+                  >
+                    {phone}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.noPhoneText, { color: Colors.neutralText }]}>بدون رقم</Text>
+              )}
+            </View>
+
+            {/* شارة الرصيد */}
+            <View
+              style={[
+                styles.badge,
+                {
+                  backgroundColor: hasDebt ? Colors.errorBg : Colors.surfaceVariant,
+                  borderColor: hasDebt ? Colors.errorLight : Colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.badgeLabel,
+                  { color: hasDebt ? Colors.creditRed : Colors.neutralText },
+                ]}
+              >
+                {hasDebt ? "مستحق عليه" : "متوازن"}
+              </Text>
+              {hasDebt && (
+                <Text
+                  style={[
+                    styles.badgeValue,
+                    { color: Colors.creditRed, writingDirection: "ltr" },
+                  ]}
+                >
+                  {formattedBalance} <Text style={styles.currency}>ر.ي</Text>
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* شريط الإجراءات */}
+          <View style={styles.bottomRow}>
+            <View style={styles.actionsGroup}>
+              <Pressable
+                style={styles.miniActionBtn}
+                onPress={onCall}
+                disabled={!phone}
+              >
+                <AppIcon
+                  name="phone"
+                  size={15}
+                  color={phone ? Colors.onSurfaceVariant : Colors.neutralText}
+                />
+              </Pressable>
+
+              <Pressable style={styles.miniActionBtn} onPress={onWhatsapp}>
+                <AppIcon name="whatsapp" size={15} color={Colors.onSurfaceVariant} />
+              </Pressable>
+
+              <Pressable style={styles.miniActionBtn} onPress={onSms}>
+                <AppIcon name="sms" size={15} color={Colors.onSurfaceVariant} />
+              </Pressable>
+
+              <Pressable style={styles.miniActionBtn} onPress={onPdf}>
+                <AppIcon name="file-pdf-box" size={15} color={Colors.onSurfaceVariant} />
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Surface>
+    );
+  }
+);
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: 16,
-    marginVertical: 6,
-    borderRadius: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    padding: 12,
+    marginHorizontal: 10,
+    marginVertical: 4,
+    borderRadius: 8,
+    overflow: "hidden",
   },
-  contentRow: {
+  cardInner: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  topRow: {
     flexDirection: "row",
     alignItems: "center",
   },
-  infoContainer: {
-    flex: 1,
-    marginLeft: 12,
+  checkboxContainer: {
+    marginRight: -4,
+    marginLeft: 2,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
     justifyContent: "center",
+    alignItems: "center",
   },
-  balanceRow: {
+  avatarText: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  infoCol: {
+    flex: 1,
+    marginHorizontal: 10,
+    alignItems: "flex-start",
+  },
+  customerName: {
+    fontSize: 14.5,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  phoneRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    gap: 4,
+  },
+  phoneText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  noPhoneText: {
+    fontSize: 11,
+    fontStyle: "italic",
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignItems: "flex-end",
+    justifyContent: "center",
+    minWidth: 72,
+  },
+  badgeLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  badgeValue: {
+    fontSize: 12.5,
+    fontWeight: "bold",
+  },
+  currency: {
+    fontSize: 9.5,
+  },
+  bottomRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 6,
+    paddingTop: 5,
+    borderTopWidth: 1,
+    borderTopColor: Colors.surfaceVariant,
+  },
+  actionsGroup: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  miniActionBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    backgroundColor: Colors.surfaceVariant,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

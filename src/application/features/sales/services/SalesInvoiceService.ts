@@ -466,6 +466,32 @@ export class SalesInvoiceServiceImpl implements SalesInvoiceService {
         });
       }
 
+            // ✅ إيراد أجور الخدمة (إلى حساب الخدمات المستقل)
+      if (invoice.serviceFee && invoice.serviceFee > 0) {
+        const serviceAcc = settings.serviceRevenueAccountId || settings.salesDefaultAccountId;
+        if (!serviceAcc) {
+          throw new Error("لم يتم ضبط حساب إيرادات الخدمات في الإعدادات المحاسبية.");
+        }
+        journalLines.push({
+          accountId: serviceAcc,
+          debit: 0,
+          credit: invoice.serviceFee,
+        });
+      }
+
+      // ✅ الخصم (مدين - يقلل الإيراد)
+      if (invoice.discountTotal && invoice.discountTotal > 0) {
+        const discountAcc = settings.salesDefaultAccountId;
+        if (!discountAcc) {
+          throw new Error("لم يتم ضبط حساب المبيعات الافتراضي لخصم الفاتورة.");
+        }
+        journalLines.push({
+          accountId: discountAcc,
+          debit: invoice.discountTotal,
+          credit: 0,
+        });
+      }
+
       this.validateJournalBalance(journalLines);
 
       const journalInput: CreateJournalEntryInput = {
@@ -682,7 +708,8 @@ export class SalesInvoiceServiceImpl implements SalesInvoiceService {
     paidAmount: number;
     paymentAccountId?: string;
   } {
-    const paidAmount = command.paidAmount;
+    const paidAmount = Math.round(command.paidAmount);
+    const invoiceTotal = Math.round(invoice.total);
 
     if (!Number.isFinite(paidAmount) || paidAmount < 0) {
       throw new Error("Paid amount must be a non-negative finite number.");
@@ -692,7 +719,7 @@ export class SalesInvoiceServiceImpl implements SalesInvoiceService {
       throw new Error("Paid amount must be an integer.");
     }
 
-    if (paidAmount > invoice.total) {
+    if (paidAmount > invoiceTotal) {
       throw new Error("Paid amount cannot exceed invoice total.");
     }
 
@@ -799,3 +826,5 @@ export class SalesInvoiceServiceImpl implements SalesInvoiceService {
     }
   }
 }
+
+

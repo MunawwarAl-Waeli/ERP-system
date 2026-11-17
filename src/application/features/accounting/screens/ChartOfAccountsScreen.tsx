@@ -1,13 +1,7 @@
-/* eslint-disable arrow-body-style */
+﻿/* eslint-disable arrow-body-style */
 /* eslint-disable no-nested-ternary */
 import React, { useState, useMemo, useCallback } from "react";
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  RefreshControl,
-  Alert,
-} from "react-native";
+import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import { useTheme, Searchbar, IconButton } from "react-native-paper";
 import {
   SafeAreaView,
@@ -21,9 +15,10 @@ import { AccountTreeNode } from "../components/AccountTreeNode";
 import { AccountFormModal } from "../components/AccountFormModal";
 import ChartOfAccount from "src/database/models/ChartOfAccount";
 import { AccountFormData } from "../schema/accountingSchema";
-import { useRootAccounts } from "../hooks/useAccountingData";
+import { useRootAccounts, useAccounts } from "../hooks/useAccountingData";
 import { accountingRepository } from "../repositories/AccountingSettingRepository";
 import { paperIcon } from "@shared/components/Icon";
+import { notify } from "@shared/notifications";
 
 interface NavigationProp {
   navigate: (screen: string, params?: Record<string, unknown>) => void;
@@ -37,7 +32,13 @@ export const ChartOfAccountsScreen: React.FC<{
   const { t } = useTranslation("accounting");
   const insets = useSafeAreaInsets();
 
-  const { accounts, isLoading, error, refresh } = useRootAccounts();
+  const {
+    accounts: rootAccounts,
+    isLoading,
+    error,
+    refresh,
+  } = useRootAccounts();
+  const { accounts: allAccounts } = useAccounts();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
@@ -48,24 +49,36 @@ export const ChartOfAccountsScreen: React.FC<{
 
   const filteredAccounts = useMemo(() => {
     if (!searchQuery.trim()) {
-      return accounts;
+      return rootAccounts;
     }
     const query = searchQuery.toLowerCase();
-    return accounts.filter(
+    return allAccounts.filter(
       (acc) =>
         acc.code.toString().includes(query) ||
         acc.name.toLowerCase().includes(query),
     );
-  }, [accounts, searchQuery]);
+  }, [rootAccounts, allAccounts, searchQuery]);
 
   const parentOptions = useMemo(() => {
-    return accounts
-      .filter((acc) => acc.id !== editingAccount?.id)
+    const getDescendantIds = (id: string, all: ChartOfAccount[]): string[] => {
+      const children = all.filter((a) => a.parentId === id);
+      return children.reduce(
+        (acc, child) => [...acc, child.id, ...getDescendantIds(child.id, all)],
+        [] as string[],
+      );
+    };
+
+    const invalidIds = editingAccount?.id
+      ? [editingAccount.id, ...getDescendantIds(editingAccount.id, allAccounts)]
+      : [];
+
+    return allAccounts
+      .filter((acc) => !invalidIds.includes(acc.id))
       .map((acc) => ({
         label: `${acc.code} - ${acc.name}`,
         value: acc.id,
       }));
-  }, [accounts, editingAccount?.id]);
+  }, [allAccounts, editingAccount?.id]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -73,7 +86,8 @@ export const ChartOfAccountsScreen: React.FC<{
       await refresh();
     } catch (e) {
       console.error(e);
-      Alert.alert(t("common.error"), t("accounting.refreshFailed"));
+      // ✅ استخدام مفتاح refreshFailed
+      notify.error(t("refreshFailed") || "فشل تحديث البيانات");
     } finally {
       setRefreshing(false);
     }
@@ -97,8 +111,21 @@ export const ChartOfAccountsScreen: React.FC<{
   };
 
   const handleAddSub = (parent: ChartOfAccount) => {
+    const siblings = allAccounts.filter((a) => a.parentId === parent.id);
+    let nextCode = `${parent.code}01`;
+
+    if (siblings.length > 0) {
+      const codes = siblings.map((s) => {
+        const suffix = s.code.substring(parent.code.length);
+        return parseInt(suffix, 10) || 0;
+      });
+      const maxCode = Math.max(...codes);
+      const suffix = (maxCode + 1).toString().padStart(2, "0");
+      nextCode = `${parent.code}${suffix}`;
+    }
+
     setEditingAccount({
-      code: "",
+      code: nextCode,
       name: "",
       type: parent.type,
       parentId: parent.id,
@@ -111,14 +138,19 @@ export const ChartOfAccountsScreen: React.FC<{
     try {
       if (data.id) {
         await accountingRepository.update(data.id, data);
+        // ✅ استخدام مفتاح accountSaved
+        notify.success(t("accountSaved") || "تم حفظ الحساب بنجاح");
       } else {
         await accountingRepository.create(data);
+        // ✅ استخدام مفتاح accountSaved
+        notify.success(t("accountSaved") || "تم حفظ الحساب بنجاح");
       }
       setModalVisible(false);
       setEditingAccount(null);
     } catch (err) {
       console.error("Account save error", err);
-      Alert.alert(t("common.error"), t("accounting.saveAccountError"));
+      // ✅ استخدام مفتاح saveAccountError
+      notify.error(t("saveAccountError") || "حدث خطأ أثناء حفظ الحساب");
     }
   };
 
@@ -128,9 +160,9 @@ export const ChartOfAccountsScreen: React.FC<{
         <View style={styles.centerContainer}>
           <EmptyState
             icon="alert-circle"
-            title={t("common.error")}
-            subtitle={t("accounting.errorLoadingAccounts")}
-            actionLabel={t("common.retry")}
+            title={t("common:error")}
+            subtitle={t("errorLoadingAccounts")}
+            actionLabel={t("common:retry")}
             onAction={() => refresh()}
           />
         </View>
@@ -152,7 +184,6 @@ export const ChartOfAccountsScreen: React.FC<{
           />
         }
       >
-        {/* شريط البحث مع زر الإضافة العلوي */}
         <View style={styles.searchRow}>
           <Searchbar
             placeholder={t("searchAccounts")}
@@ -193,8 +224,8 @@ export const ChartOfAccountsScreen: React.FC<{
             ) : (
               <EmptyState
                 icon="file-document-outline"
-                title={t("noAccountsFound")}
-                subtitle={t("noAccountsDescription")}
+                title={t("noAccounts")}
+                subtitle={t("noAccountsDesc")}
                 actionLabel={t("addAccount")}
                 onAction={handleAddRoot}
               />

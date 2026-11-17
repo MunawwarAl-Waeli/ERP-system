@@ -66,6 +66,9 @@ export default class AccountingSetting extends Model {
   @text("cogs_default_account_id")
   cogsDefaultAccountId?: string | null;
 
+  @text("service_revenue_account_id")
+  serviceRevenueAccountId?: string | null;
+
   @relation("customers_accounts", "customers_account_id")
   customersAccount!: Relation<ChartOfAccount>;
 
@@ -92,4 +95,5 @@ export default class AccountingSetting extends Model {
   @date("updated_at")
   updatedAt!: number;
 }
+
 

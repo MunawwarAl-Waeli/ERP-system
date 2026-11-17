@@ -25,6 +25,7 @@ interface AccountingSettingsData {
   inventoryDefaultAccountId: string;
   salesDefaultAccountId: string;
   cogsDefaultAccountId: string;
+  serviceRevenueAccountId: string;
   customersAccountId: string;
   suppliersAccountId: string;
   cashDefaultAccountId: string;
@@ -110,6 +111,11 @@ export const AccountingSettingsScreen: React.FC<{ navigation: any }> = ({
       key: "cogsDefaultAccountId",
       title: "حساب تكلفة المبيعات الافتراضي",
       icon: "calculator",
+    },
+    {
+      key: "serviceRevenueAccountId",
+      title: "حساب إيرادات الخدمات (شغل اليد)",
+      icon: "wrench",
     },
     {
       key: "customersAccountId",
@@ -271,4 +277,5 @@ const styles = StyleSheet.create({
   },
   saveBtn: { borderRadius: 8 },
 });
+
 

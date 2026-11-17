@@ -1,264 +1,384 @@
-/* eslint-disable no-nested-ternary */
-/* eslint-disable complexity */
-/* eslint-disable no-duplicate-imports */
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Linking, Alert } from 'react-native';
-import { Text, useTheme, Card, Button, Portal, Dialog, TextInput } from 'react-native-paper';
-import { useTranslation } from 'react-i18next';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppHeader } from '@shared/components/AppHeader';
-import { paperIcon } from '@shared/components/Icon';
-import { CurrencyText } from '@shared/components/CurrencyText';
-import { LoadingOverlay } from '@shared/components/LoadingOverlay';
-import { ConfirmDialog } from '@shared/components/ConfirmDialog';
-import { CreditLedger } from '../components/CreditLedger';
-import { useCustomerDetail } from '../hooks/useCustomers';
-import { customerRepository } from '../repositories/customerRepository';
-import { AppIcon } from '@shared/components/Icon';
-import { CURRENCY_SYMBOL } from '@core/constants';
+import React, { useState, useCallback } from "react";
+import { View, StyleSheet, ScrollView, Linking, Pressable } from "react-native";
+import { Text, Surface, Button } from "react-native-paper";
+import { useTranslation } from "react-i18next";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { AppHeader } from "@shared/components/AppHeader";
+import { AppIcon } from "src/shared/components/Icon";
+import { CurrencyText } from "@shared/components/CurrencyText";
+import { LoadingOverlay } from "@shared/components/LoadingOverlay";
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
+import { CreditLedger } from "../components/CreditLedger";
+import { PaymentDialog } from "../components/PaymentDialog";
+import { useCustomerDetail } from "../hooks/useCustomers";
+import { customerRepository } from "../repositories/customerRepository";
+import { notify } from "@shared/notifications";
+import { Colors } from "src/core/theme/colors";
 
 interface NavigationProp {
-    navigate: (screen: string, params?: Record<string, unknown>) => void;
-    goBack: () => void;
+  navigate: (screen: string, params?: Record<string, unknown>) => void;
+  goBack: () => void;
 }
 
-export const CustomerDetailScreen: React.FC<{ navigation: NavigationProp; route: { params: { customerId: string } } }> = ({
-    navigation,
-    route,
-}) => {
-    const { customerId } = route.params;
-    const theme = useTheme();
-    const { t } = useTranslation('customers');
-    const { customer, outstandingCredit, isLoading } = useCustomerDetail(customerId);
+export const CustomerDetailScreen: React.FC<{
+  navigation: NavigationProp;
+  route: { params: { customerId: string } };
+}> = ({ navigation, route }) => {
+  const { customerId } = route.params;
+  const { t } = useTranslation("customers");
+  const { customer, outstandingCredit, isLoading } =
+    useCustomerDetail(customerId);
 
-    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-    const [paymentAmount, setPaymentAmount] = useState('');
-    const [paymentNotes, setPaymentNotes] = useState('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [isSavingPayment, setIsSavingPayment] = useState(false);
 
-    const handleDelete = async () => {
-        try {
-            await customerRepository.deactivate(customerId);
-            setShowDeleteDialog(false);
-            navigation.goBack();
-        } catch {
-            Alert.alert(t('common:error'), t('common:operationFailed'));
-        }
-    };
-
-    const handleCollectPayment = async () => {
-        const amount = parseFloat(paymentAmount);
-        if (isNaN(amount) || amount <= 0) {
-            return;
-        }
-
-        try {
-            // await customerRepository.addCreditPayment(customerId, amount, paymentNotes);
-            setShowPaymentDialog(false);
-            setPaymentAmount('');
-            setPaymentNotes('');
-        } catch {
-            Alert.alert(t('common:error'), t('common:operationFailed'));
-        }
-    };
-
-    if (isLoading || !customer) {
-        return (
-            <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
-                <LoadingOverlay visible />
-            </SafeAreaView>
-        );
+  const handleDelete = async () => {
+    try {
+      await customerRepository.deactivate(customerId);
+      setShowDeleteDialog(false);
+      notify.success(t("customerDeleted") || "تم تعطيل العميل بنجاح");
+      navigation.goBack();
+    } catch {
+      notify.error(t("common:operationFailed") || "فشلت العملية");
     }
+  };
 
-    return (
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
-            <AppHeader
-                title={customer.name}
-                showBack
-                onBack={() => navigation.goBack()}
-                actions={[
-                    { icon: 'pencil', onPress: () => navigation.navigate('CustomerForm', { customerId }) },
-                    { icon: 'delete', onPress: () => setShowDeleteDialog(true) },
+  const handleCollectPayment = async (amount: number, notes: string) => {
+    setIsSavingPayment(true);
+    try {
+      await customerRepository.addCreditPayment(customerId, amount, notes);
+      setShowPaymentDialog(false);
+      notify.success(t("paymentRecorded") || "تم تسجيل الدفعة بنجاح");
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "فشلت العملية");
+    } finally {
+      setIsSavingPayment(false);
+    }
+  };
+
+  const handleCall = useCallback(() => {
+    if (customer?.phone) {
+      Linking.openURL(`tel:${customer.phone}`);
+    }
+  }, [customer?.phone]);
+
+  const handleWhatsapp = useCallback(() => {
+    if (customer?.phone) {
+      const msg = `مرحباً ${customer.name}، نود تذكيركم بأن الرصيد المستحق لحسابكم هو ${outstandingCredit} ر.ي.`;
+      Linking.openURL(
+        `https://wa.me/${customer.phone}?text=${encodeURIComponent(msg)}`,
+      );
+    }
+  }, [customer, outstandingCredit]);
+
+  if (isLoading || !customer) {
+    return <LoadingOverlay visible />;
+  }
+
+  const hasDebt = outstandingCredit > 0;
+  const avatarLetter = customer.name.trim().charAt(0) || "ع";
+
+  return (
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: Colors.background }]}
+      edges={["top"]}
+    >
+      {/* الترويسة العليا */}
+      <AppHeader
+        title={customer.name}
+        showBack
+        onBack={() => navigation.goBack()}
+        actions={[
+          {
+            icon: "pencil",
+            onPress: () => navigation.navigate("CustomerForm", { customerId }),
+          },
+          {
+            icon: "delete",
+            onPress: () => setShowDeleteDialog(true),
+          },
+        ]}
+      />
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 1. بطاقة معلومات العميل والتواصل السريع */}
+        <Surface style={styles.card} elevation={0}>
+          <View style={styles.profileHeader}>
+            <View
+              style={[
+                styles.avatar,
+                {
+                  backgroundColor: hasDebt ? Colors.errorBg : Colors.successBg,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.avatarText,
+                  { color: hasDebt ? Colors.creditRed : Colors.paymentGreen },
                 ]}
-            />
+              >
+                {avatarLetter}
+              </Text>
+            </View>
 
-            <ScrollView style={styles.scrollView}>
-                {/* Customer Info Card */}
-                <Card style={styles.infoCard} mode="elevated">
-                    <Card.Content>
-                        <View style={styles.infoRow}>
-                            <AppIcon name="phone" size={20} color={theme.colors.onSurfaceVariant} />
-                            <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
-                                {customer.phone || t('noPhone')}
-                            </Text>
-                            {customer.phone ? (
-                                <Button
-                                    mode="text"
-                                    compact
-                                    onPress={() => Linking.openURL(`tel:${customer.phone}`)}
-                                >
-                                    {t('call')}
-                                </Button>
-                            ) : null}
-                        </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.customerName}>{customer.name}</Text>
+              <Text style={styles.phoneText}>
+                {customer.phone || t("noPhone") || "بدون رقم هاتف"}
+              </Text>
+            </View>
 
-                        {customer.address ? (
-                            <View style={styles.infoRow}>
-                                <AppIcon name="map-marker" size={20} color={theme.colors.onSurfaceVariant} />
-                                <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
-                                    {customer.address}
-                                </Text>
-                            </View>
-                        ) : null}
+            {/* أزرار الاتصال والواتساب السريعة */}
+            <View style={styles.quickActions}>
+              {customer.phone && (
+                <>
+                  <Pressable style={styles.iconBtn} onPress={handleCall}>
+                    <AppIcon
+                      name="phone"
+                      size={16}
+                      color={Colors.onSurfaceVariant}
+                    />
+                  </Pressable>
+                  <Pressable style={styles.iconBtn} onPress={handleWhatsapp}>
+                    <AppIcon
+                      name="whatsapp"
+                      size={16}
+                      color={Colors.paymentGreen}
+                    />
+                  </Pressable>
+                </>
+              )}
+            </View>
+          </View>
 
-                        {customer.notes ? (
-                            <View style={styles.infoRow}>
-                                <AppIcon name="note-text" size={20} color={theme.colors.onSurfaceVariant} />
-                                <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
-                                    {customer.notes}
-                                </Text>
-                            </View>
-                        ) : null}
-                    </Card.Content>
-                </Card>
+          {(customer.address || customer.notes) && (
+            <View style={styles.divider} />
+          )}
 
-                {/* Credit / Advance Summary */}
-                <Card style={styles.creditCard} mode="elevated">
-                    <Card.Content>
-                        <View style={styles.creditHeader}>
-                            <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-                                {outstandingCredit > 0 ? t('outstandingCredit') : outstandingCredit < 0 ? t('advanceBalance') : t('outstandingCredit')}
-                            </Text>
-                            <CurrencyText
-                                amount={Math.abs(outstandingCredit)}
-                                variant="headlineSmall"
-                                color={outstandingCredit > 0 ? theme.colors.error : outstandingCredit < 0 ? theme.colors.primary : theme.colors.onSurfaceVariant}
-                            />
-                        </View>
-                        {outstandingCredit < 0 && (
-                            <Text variant="bodySmall" style={{ color: theme.colors.primary, marginTop: 4 }}>
-                                {t('advanceNote')}
-                            </Text>
-                        )}
-                        <Button
-                            mode="contained"
-                            icon={paperIcon('cash-plus')}
-                            onPress={() => setShowPaymentDialog(true)}
-                            style={styles.collectButton}
-                        >
-                            {t('collectPayment')}
-                        </Button>
-                    </Card.Content>
-                </Card>
+          {customer.address ? (
+            <View style={styles.infoRow}>
+              <AppIcon name="map-marker" size={14} color={Colors.neutralText} />
+              <Text style={styles.infoText}>{customer.address}</Text>
+            </View>
+          ) : null}
 
-                {/* زر الانتقال لكشف الحساب المفصل والمالي */}
-                <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-                    <Button
-                        mode="outlined"
-                        icon={paperIcon('file-document-outline')}
-                        onPress={() => navigation.navigate('CustomerLedger', { customerId })}
-                        style={{ borderColor: theme.colors.primary }}
-                    >
-                        {t('viewDetailedLedger') || 'عرض كشف الحساب المالي المفصل'}
-                    </Button>
-                </View>
+          {customer.notes ? (
+            <View style={styles.infoRow}>
+              <AppIcon name="note-text" size={14} color={Colors.neutralText} />
+              <Text style={styles.infoText}>{customer.notes}</Text>
+            </View>
+          ) : null}
+        </Surface>
 
-                {/* Credit Ledger */}
-                <View style={styles.ledgerSection}>
-                    <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
-                        {t('creditHistory')}
-                    </Text>
-                    <CreditLedger customerId={customerId} />
-                </View>
-            </ScrollView>
+        {/* 2. بطاقة الرصيد المستحق وتحصيل الدفعات */}
+        <Surface
+          style={[
+            styles.card,
+            {
+              backgroundColor: hasDebt ? Colors.errorBg : Colors.surface,
+              borderColor: hasDebt ? Colors.errorLight : Colors.border,
+            },
+          ]}
+          elevation={0}
+        >
+          <View style={styles.creditHeader}>
+            <View>
+              <Text style={styles.creditLabel}>
+                {hasDebt
+                  ? t("outstandingCredit") || "الرصيد المستحق عليه"
+                  : t("advanceBalance") || "الحساب متوازن / رصيد مقدم"}
+              </Text>
 
-            {/* Delete Confirmation */}
-            <ConfirmDialog
-                visible={showDeleteDialog}
-                title={t('deleteCustomer')}
-                message={t('deleteConfirm')}
-                confirmLabel={t('common:delete')}
-                onConfirm={handleDelete}
-                onDismiss={() => setShowDeleteDialog(false)}
-                destructive
-            />
+              <View style={styles.amountRow}>
+                <CurrencyText
+                  amount={Math.abs(outstandingCredit)}
+                  variant="headlineSmall"
+                  color={hasDebt ? Colors.creditRed : Colors.paymentGreen}
+                />
+              </View>
+            </View>
 
-            {/* Payment Dialog */}
-            <Portal>
-                <Dialog visible={showPaymentDialog} onDismiss={() => setShowPaymentDialog(false)}>
-                    <Dialog.Title>{t('collectPayment')}</Dialog.Title>
-                    <Dialog.Content>
-                        <TextInput
-                            label={t('common:amount')}
-                            value={paymentAmount}
-                            onChangeText={setPaymentAmount}
-                            keyboardType="numeric"
-                            mode="outlined"
-                            left={<TextInput.Affix text={CURRENCY_SYMBOL} />}
-                            style={styles.dialogInput}
-                        />
-                        <TextInput
-                            label={t('common:notes')}
-                            value={paymentNotes}
-                            onChangeText={setPaymentNotes}
-                            mode="outlined"
-                            style={styles.dialogInput}
-                        />
-                    </Dialog.Content>
-                    <Dialog.Actions>
-                        <Button onPress={() => setShowPaymentDialog(false)}>{t('common:cancel')}</Button>
-                        <Button
-                            mode="contained"
-                            onPress={handleCollectPayment}
-                            disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}
-                        >
-                            {t('collectPayment')}
-                        </Button>
-                    </Dialog.Actions>
-                </Dialog>
-            </Portal>
-        </SafeAreaView>
-    );
+            {/* زر تحصيل دفعة */}
+            <Button
+              mode="contained"
+              icon={({ size, color }) => (
+                <AppIcon name="cash-plus" size={size} color={color} />
+              )}
+              onPress={() => setShowPaymentDialog(true)}
+              style={[styles.collectBtn, { backgroundColor: Colors.primary }]}
+              labelStyle={styles.btnLabel}
+            >
+              {t("collectPayment") || "تسجيل دفعة"}
+            </Button>
+          </View>
+        </Surface>
+
+        {/* 3. زر الانتقال لكشف الحساب التفصيلي */}
+        <Button
+          mode="outlined"
+          icon={({ size, color }) => (
+            <AppIcon name="receipt-text-outline" size={size} color={color} />
+          )}
+          onPress={() => navigation.navigate("CustomerLedger", { customerId })}
+          style={styles.ledgerBtn}
+          textColor={Colors.primary}
+        >
+          {t("viewDetailedLedger") || "عرض كشف الحساب التفصيلي"}
+        </Button>
+
+        {/* 4. سجل الحركات المختصر */}
+        <View style={styles.ledgerSection}>
+          <Text style={styles.sectionTitle}>
+            {t("creditHistory") || "آخر الحركات المسجلة"}
+          </Text>
+          <CreditLedger customerId={customerId} />
+        </View>
+      </ScrollView>
+
+      {/* نافذة تأكيد الحذف */}
+      <ConfirmDialog
+        visible={showDeleteDialog}
+        title={t("deleteCustomer") || "تعطيل حساب العميل"}
+        message={
+          t("deleteConfirm") || "هل أنت أصل من رغبتك في تعطيل هذا العميل؟"
+        }
+        confirmLabel={t("common:delete") || "تعطيل"}
+        onConfirm={handleDelete}
+        onDismiss={() => setShowDeleteDialog(false)}
+        destructive
+      />
+
+      {/* نافذة تسجيل الدفعة الموحدة */}
+      <PaymentDialog
+        visible={showPaymentDialog}
+        onDismiss={() => setShowPaymentDialog(false)}
+        onSubmit={handleCollectPayment}
+        maxAmount={outstandingCredit}
+        isLoading={isSavingPayment}
+      />
+    </SafeAreaView>
+  );
 };
 
+export default CustomerDetailScreen;
+
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    scrollView: {
-        flex: 1,
-    },
-    infoCard: {
-        margin: 16,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        paddingVertical: 8,
-    },
-    creditCard: {
-        marginHorizontal: 16,
-        marginBottom: 16,
-    },
-    creditHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    collectButton: {
-        marginTop: 12,
-    },
-    ledgerSection: {
-        flex: 1,
-        marginBottom: 16,
-    },
-    sectionTitle: {
-        paddingHorizontal: 16,
-        marginBottom: 8,
-        fontWeight: '700',
-    },
-    dialogInput: {
-        marginBottom: 12,
-    },
+  container: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 10,
+    paddingBottom: 30,
+  },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 12,
+    marginBottom: 10,
+  },
+  profileHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarText: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  profileInfo: {
+    flex: 1,
+    marginHorizontal: 10,
+    alignItems: "flex-start",
+  },
+  customerName: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: Colors.onSurface,
+    marginBottom: 2,
+  },
+  phoneText: {
+    fontSize: 12,
+    color: Colors.onSurfaceVariant,
+    fontWeight: "500",
+  },
+  quickActions: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  iconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: Colors.surfaceVariant,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.surfaceVariant,
+    marginVertical: 8,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 2,
+  },
+  infoText: {
+    fontSize: 11.5,
+    color: Colors.onSurfaceVariant,
+  },
+  creditHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  creditLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: Colors.neutralText,
+  },
+  amountRow: {
+    marginTop: 2,
+  },
+  collectBtn: {
+    borderRadius: 8,
+  },
+  btnLabel: {
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  ledgerBtn: {
+    borderColor: Colors.primary,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  ledgerSection: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: Colors.onSurface,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
 });

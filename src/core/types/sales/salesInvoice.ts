@@ -1,4 +1,4 @@
-// 1. الأنواع والـ DTOs (في src/core/types/sales/salesInvoice.ts)
+﻿// 1. Ø§Ù„Ø£Ù†ÙˆØ§Ø¹ ÙˆØ§Ù„Ù€ DTOs (ÙÙŠ src/core/types/sales/salesInvoice.ts)
 import {
   DocumentStatus,
   PaymentType,
@@ -13,11 +13,14 @@ export interface SalesInvoiceItemInput {
 }
 
 export interface CreateSalesInvoiceInput {
+  discountTotal?: number;
+  serviceFee?: number;
+  paidAmount?: number;
   customerId?: string;
   // invoiceNumber?: string;
   invoiceDate: string;
   paymentType: PaymentType;
-  paidAmount?: number;
+  // paidAmount?: number;
   createdBy: string;
   idempotencyKey?: string;
   items: SalesInvoiceItemInput[];
@@ -30,7 +33,7 @@ export interface SaleItemBatchConsumptionInput {
   quantity: number;
   unitCost: number;
 }
-// ينفذ عملية الترحيل لانه نحتاج نعرف المبلغ وهل كاش او بنك
+// ÙŠÙ†ÙØ° Ø¹Ù…Ù„ÙŠØ© Ø§Ù„ØªØ±Ø­ÙŠÙ„ Ù„Ø§Ù†Ù‡ Ù†Ø­ØªØ§Ø¬ Ù†Ø¹Ø±Ù Ø§Ù„Ù…Ø¨Ù„Øº ÙˆÙ‡Ù„ ÙƒØ§Ø´ Ø§Ùˆ Ø¨Ù†Ùƒ
 export interface PostSalesInvoiceCommand {
   salesInvoiceId: string;
   paidAmount: number;
@@ -84,6 +87,8 @@ export interface SalesInvoiceData {
   status: DocumentStatus;
   total: number;
   paidAmount: number;
+  serviceFee:number;
+  discountTotal:number;
   createdBy: string;
   idempotencyKey?: string;
   isCancelled: boolean;
@@ -92,4 +97,5 @@ export interface SalesInvoiceData {
   createdAt: number;
   updatedAt: number;
 }
+
 

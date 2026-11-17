@@ -1,4 +1,4 @@
-import { Database, Q } from "@nozbe/watermelondb";
+﻿import { Database, Q } from "@nozbe/watermelondb";
 
 import JournalEntry from "src/database/models/JournalEntry";
 import JournalEntryLine from "src/database/models/JournalEntryLine";
@@ -356,7 +356,7 @@ export class WatermelonJournalEntryRepository
       referenceType: entry.referenceType
         ? (entry.referenceType as ReferenceType)
         : undefined,
-      referenceId: entry.referenceId ?? undefined, // ✅ ممتاز! أخذت الـ null من الداتابيز وحولته لـ undefined
+      referenceId: entry.referenceId ?? undefined, // âœ… Ù…Ù…ØªØ§Ø²! Ø£Ø®Ø°Øª Ø§Ù„Ù€ null Ù…Ù† Ø§Ù„Ø¯Ø§ØªØ§Ø¨ÙŠØ² ÙˆØ­ÙˆÙ„ØªÙ‡ Ù„Ù€ undefined
 
       description: entry.description ?? undefined,
 
@@ -428,3 +428,6 @@ export class WatermelonJournalEntryRepository
     return new Date(timestamp).toISOString().slice(0, 10);
   }
 }
+
+
+

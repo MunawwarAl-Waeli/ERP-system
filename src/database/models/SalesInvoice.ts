@@ -1,4 +1,4 @@
-import { Model, Relation, Query } from "@nozbe/watermelondb";
+﻿import { Model, Relation, Query } from "@nozbe/watermelondb";
 import {
   field,
   text,
@@ -61,6 +61,12 @@ export default class SalesInvoice extends Model {
   @field("paid_amount")
   paidAmount!: number;
 
+  @field("service_fee")
+  serviceFee!: number;
+
+  @field("discount_total")
+  discountTotal!: number;
+
   @text("created_by")
   createdBy!: string;
 
@@ -90,3 +96,4 @@ export default class SalesInvoice extends Model {
   @date("updated_at")
   updatedAt!: number;
 }
+

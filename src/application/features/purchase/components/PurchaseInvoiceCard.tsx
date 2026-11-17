@@ -49,11 +49,15 @@ export const PurchaseInvoiceCard: React.FC<PurchaseInvoiceCardProps> = ({
 
   const getStatusVariant = (): "info" | "success" | "error" | "warning" => {
     switch (status) {
-      case "draft": return "warning";
+      case "draft":
+        return "warning";
       case "approved":
-      case "posted": return "success";
-      case "cancelled": return "error";
-      default: return "info";
+      case "posted":
+        return "success";
+      case "cancelled":
+        return "error";
+      default:
+        return "info";
     }
   };
 
@@ -74,16 +78,25 @@ export const PurchaseInvoiceCard: React.FC<PurchaseInvoiceCardProps> = ({
         </View>
 
         <View style={styles.middleRow}>
-          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+          <Text
+            variant="bodyMedium"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
             {supplierName}
           </Text>
-          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+          <Text
+            variant="bodySmall"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
             {date}
           </Text>
         </View>
 
         <View style={styles.bottomRow}>
-          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+          <Text
+            variant="bodyMedium"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
             {t("total")}
           </Text>
           <CurrencyText amount={total} variant="titleMedium" />
@@ -94,8 +107,27 @@ export const PurchaseInvoiceCard: React.FC<PurchaseInvoiceCardProps> = ({
 };
 
 const styles = StyleSheet.create({
-  card: { marginHorizontal: 16, marginBottom: 10, borderRadius: 12, padding: 14 },
-  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  middleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  bottomRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  card: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderRadius: 12,
+    padding: 14,
+  },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  middleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  bottomRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
 });

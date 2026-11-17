@@ -152,11 +152,17 @@ export const SalesInvoiceDetailScreen: React.FC<
 
     setIsPosting(true);
     try {
+      // ✅ إجبار المبلغ المدفوع ليكون مطابقاً للإجمالي في حالة النقدي لتجنب أي مشاكل
+      let finalPaidAmount = 0;
+      if (invoice.paymentType === PAYMENT_TYPES.CASH) {
+        finalPaidAmount = invoice.total;
+      } else if (invoice.paymentType === PAYMENT_TYPES.PARTIAL) {
+        finalPaidAmount = invoice.paidAmount || 0;
+      }
+
       await services.salesInvoice.post({
         salesInvoiceId: invoice.id,
-        paidAmount:
-          invoice.paidAmount ||
-          (invoice.paymentType === PAYMENT_TYPES.CASH ? invoice.total : 0),
+        paidAmount: Math.round(finalPaidAmount),
         paymentAccountId,
       });
       notify.success(
@@ -544,6 +550,50 @@ export const SalesInvoiceDetailScreen: React.FC<
               </Text>
             </View>
 
+            {(invoice.serviceFee || 0) > 0 && (
+              <View style={styles.summaryRow}>
+                <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                  {t("serviceFee") || "أجور الخدمات"}
+                </Text>
+                <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                  {CURRENCY_SYMBOL}{(invoice.serviceFee || 0).toFixed(2)}
+                </Text>
+              </View>
+            )}
+
+            {(invoice.discountTotal || 0) > 0 && (
+              <View style={styles.summaryRow}>
+                <Text variant="bodyMedium" style={{ color: theme.colors.error }}>
+                  {t("discount") || "الخصم"}
+                </Text>
+                <Text variant="bodyMedium" style={{ color: theme.colors.error }}>
+                  - {CURRENCY_SYMBOL}{(invoice.discountTotal || 0).toFixed(2)}
+                </Text>
+              </View>
+            )}
+
+            {(invoice.paidAmount || 0) > 0 && (
+              <View style={styles.summaryRow}>
+                <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                  {t("paidAmount") || "المبلغ المدفوع"}
+                </Text>
+                <Text variant="bodyMedium" style={{ color: theme.colors.primary, fontWeight: "bold" }}>
+                  {CURRENCY_SYMBOL}{(invoice.paidAmount || 0).toFixed(2)}
+                </Text>
+              </View>
+            )}
+
+            {(invoice.paymentType === PAYMENT_TYPES.CREDIT || invoice.paymentType === PAYMENT_TYPES.PARTIAL) && (
+              <View style={styles.summaryRow}>
+                <Text variant="bodyMedium" style={{ color: theme.colors.error }}>
+                  {t("remainingAmount") || "المبلغ المتبقي (آجل)"}
+                </Text>
+                <Text variant="bodyMedium" style={{ color: theme.colors.error, fontWeight: "bold" }}>
+                  {CURRENCY_SYMBOL}{(invoice.total - (invoice.paidAmount || 0)).toFixed(2)}
+                </Text>
+              </View>
+            )}
+
             <Divider style={styles.totalDivider} />
 
             <View style={styles.grandTotalRow}>
@@ -748,3 +798,6 @@ const styles = StyleSheet.create({
   newBillButton: { flex: 1, borderRadius: 10 },
   buttonContent: { paddingVertical: 4 },
 });
+
+
+

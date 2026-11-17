@@ -1,80 +1,80 @@
 export const Colors = {
-  // Primary — Deep Green (Kirana/grocery feel)
-  primary: '#2E7D32',
-  primaryLight: '#60AD5E',
-  primaryDark: '#005005',
-  onPrimary: '#FFFFFF',
+  // Primary — Modern Soft Emerald Green (زمردي هادئ وراقي)
+  primary: "hsl(253, 44%, 50%)",
+  primaryLight: "#4ADE80",
+  primaryDark: "#0D5C3A",
+  onPrimary: "#FFFFFF",
 
-  // Secondary — Amber
-  secondary: '#F9A825',
-  secondaryLight: '#FFD95A',
-  secondaryDark: '#C17900',
-  onSecondary: '#000000',
+  // Secondary — Warm Amber (عنبري ناعم)
+  secondary: "#D97706",
+  secondaryLight: "#FDE68A",
+  secondaryDark: "#B45309",
+  onSecondary: "#FFFFFF",
 
-  // Tertiary — Blue
-  tertiary: '#0277BD',
-  tertiaryLight: '#58A5F0',
-  tertiaryDark: '#004C8C',
-  onTertiary: '#FFFFFF',
+  // Tertiary — Slate Blue (أزرق هادئ)
+  tertiary: "#0284C7",
+  tertiaryLight: "#BAE6FD",
+  tertiaryDark: "#0369A1",
+  onTertiary: "#FFFFFF",
 
-  // Error
-  error: '#D32F2F',
-  errorLight: '#FF6659',
-  errorDark: '#9A0007',
-  onError: '#FFFFFF',
+  // Error — Soft Crimson (أحمر وردي مريح للعين)
+  error: "#E11D48",
+  errorLight: "#FECDD3",
+  errorDark: "#9F1239",
+  onError: "#FFFFFF",
 
-  // Success
-  success: '#388E3C',
-  successLight: '#6ABF69',
-  successDark: '#00600F',
+  // Success — Soft Green
+  success: "#16A34A",
+  successLight: "#BBF7D0",
+  successDark: "#14532D",
 
-  // Warning
-  warning: '#F57C00',
-  warningLight: '#FFB74D',
-  warningDark: '#E65100',
+  // Warning — Soft Orange
+  warning: "#EA580C",
+  warningLight: "#FED7AA",
+  warningDark: "#9A3412",
 
-  // Info
-  info: '#0288D1',
-  infoLight: '#5EB8FF',
-  infoDark: '#005B9F',
+  // Info — Soft Sky Blue
+  info: "#0288D1",
+  infoLight: "#E0F2FE",
+  infoDark: "#0369A1",
 
-  // Neutral
-  background: '#FAFAFA',
-  surface: '#FFFFFF',
-  surfaceVariant: '#F5F5F5',
-  outline: '#79747E',
-  onBackground: '#1C1B1F',
-  onSurface: '#1C1B1F',
-  onSurfaceVariant: '#49454F',
+  // Neutral — Slate Grays (خلفيات ناعمة ومحايدة تماماً)
+  background: "#F8FAFC",
+  surface: "#FFFFFF",
+  surfaceVariant: "#F1F5F9",
+  outline: "#CBD5E1",
+  onBackground: "#0F172A",
+  onSurface: "#0F172A",
+  onSurfaceVariant: "#475569",
 
-  // Dark theme overrides
+  // Dark theme overrides (ثيم ليلي هادئ)
   dark: {
-    background: '#121212',
-    surface: '#1E1E1E',
-    surfaceVariant: '#2C2C2C',
-    onBackground: '#E6E1E5',
-    onSurface: '#E6E1E5',
-    onSurfaceVariant: '#CAC4D0',
-    primary: '#81C784',
-    secondary: '#FFD54F',
-    tertiary: '#4FC3F7',
+    background: "#0F172A",
+    surface: "#1E293B",
+    surfaceVariant: "#334155",
+    onBackground: "#F8FAFC",
+    onSurface: "#F8FAFC",
+    onSurfaceVariant: "#94A3B8",
+    primary: "#4ADE80",
+    secondary: "#FBBF24",
+    tertiary: "#38BDF8",
   },
 
   // Stock level colors
-  stockOk: '#4CAF50',
-  stockLow: '#FF9800',
-  stockOut: '#F44336',
+  stockOk: "#16A34A",
+  stockLow: "#D97706",
+  stockOut: "#E11D48",
 
-  // Credit colors
-  creditRed: '#E53935',
-  paymentGreen: '#43A047',
+  // Credit colors (ألوان الأرصدة والديون)
+  creditRed: "#E11D48",
+  paymentGreen: "#16A34A",
 
-  // Light tint backgrounds (for badges, highlights)
-  successBg: '#E8F5E9',
-  warningBg: '#FFF3E0',
-  errorBg: '#FFEBEE',
-  infoBg: '#E3F2FD',
-  neutralBg: '#F5F5F5',
-  neutralText: '#616161',
-  border: '#E0E0E0',
+  // Light tint backgrounds (خلفيات البادجات والكبسولات الناعمة جداً)
+  successBg: "#F0FDF4",
+  warningBg: "#FFFBEB",
+  errorBg: "#FFF1F2",
+  infoBg: "#F0F9FF",
+  neutralBg: "#F8FAFC",
+  neutralText: "#64748B",
+  border: "#E2E8F0",
 } as const;

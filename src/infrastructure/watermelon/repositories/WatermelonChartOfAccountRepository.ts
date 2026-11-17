@@ -22,47 +22,34 @@ export class WatermelonChartOfAccountRepository
 
   async getById(id: string): Promise<ChartOfAccountData | null> {
     const normalizedId = id.trim();
-
-    if (!normalizedId) {
-      throw new Error("معرف الحساب مطلوب.");
-    }
+    if (!normalizedId) throw new Error("معرف الحساب مطلوب.");
 
     try {
       const account = await this.accounts.find(normalizedId);
-
       return this.toData(account);
     } catch (error) {
-      if (this.isRecordNotFoundError(error)) {
-        return null;
-      }
-
+      if (this.isRecordNotFoundError(error)) return null;
       throw error;
     }
   }
 
   async getByCode(code: string): Promise<ChartOfAccountData | null> {
     const normalizedCode = this.normalizeCode(code);
-
     const accounts = await this.accounts
       .query(Q.where("code", normalizedCode), Q.take(2))
       .fetch();
 
-    if (accounts.length === 0) {
-      return null;
-    }
-
-    if (accounts.length > 1) {
+    if (accounts.length === 0) return null;
+    if (accounts.length > 1)
       throw new Error(
         `سلامة البيانات: يوجد أكثر من حساب بالكود ${normalizedCode}.`,
       );
-    }
 
     return this.toData(accounts[0]);
   }
 
   async getAll(): Promise<ChartOfAccountData[]> {
     const accounts = await this.accounts.query(Q.sortBy("code", Q.asc)).fetch();
-
     return accounts.map((account: ChartOfAccount) => this.toData(account));
   }
 
@@ -70,7 +57,6 @@ export class WatermelonChartOfAccountRepository
     const accounts = await this.accounts
       .query(Q.where("is_active", true), Q.sortBy("code", Q.asc))
       .fetch();
-
     return accounts.map((account: ChartOfAccount) => this.toData(account));
   }
 
@@ -82,7 +68,6 @@ export class WatermelonChartOfAccountRepository
         Q.sortBy("code", Q.asc),
       )
       .fetch();
-
     return accounts.map((account: ChartOfAccount) => this.toData(account));
   }
 
@@ -94,21 +79,16 @@ export class WatermelonChartOfAccountRepository
         Q.sortBy("code", Q.asc),
       )
       .fetch();
-
     return accounts.map((account: ChartOfAccount) => this.toData(account));
   }
 
   async getChildren(parentId: string): Promise<ChartOfAccountData[]> {
     const normalizedParentId = parentId.trim();
-
-    if (!normalizedParentId) {
-      throw new Error("معرف الحساب الأب مطلوب.");
-    }
+    if (!normalizedParentId) throw new Error("معرف الحساب الأب مطلوب.");
 
     const accounts = await this.accounts
       .query(Q.where("parent_id", normalizedParentId), Q.sortBy("code", Q.asc))
       .fetch();
-
     return accounts.map((account: ChartOfAccount) => this.toData(account));
   }
 
@@ -116,7 +96,6 @@ export class WatermelonChartOfAccountRepository
     const accounts = await this.accounts
       .query(Q.where("parent_id", null), Q.sortBy("code", Q.asc))
       .fetch();
-
     return accounts.map((account: ChartOfAccount) => this.toData(account));
   }
 
@@ -133,36 +112,29 @@ export class WatermelonChartOfAccountRepository
 
     if (normalizedInput.parentId) {
       const parent = await this.getRequiredAccount(normalizedInput.parentId);
-
       this.validateCashAccountRelation(
         normalizedInput.isCashAccount,
         normalizedInput.type,
       );
-
-      if (!parent.isActive) {
+      if (!parent.isActive)
         throw new Error("لا يمكن إنشاء حساب تحت حساب أب غير نشط.");
-      }
     }
 
-    const account = this.accounts.prepareCreate((record: { code: string; name: string; type: string; parentId: string | null; allowPosting: boolean; isCashAccount: boolean; isActive: boolean; }) => {
-      record.code = normalizedInput.code;
+    // ✅ إصلاح معماري: تغليف الـ batch داخل database.write
+    return await this.database.write(async () => {
+      const account = this.accounts.prepareCreate((record: any) => {
+        record.code = normalizedInput.code;
+        record.name = normalizedInput.name;
+        record.type = normalizedInput.type;
+        record.parentId = normalizedInput.parentId ?? null;
+        record.allowPosting = normalizedInput.allowPosting;
+        record.isCashAccount = normalizedInput.isCashAccount;
+        record.isActive = true;
+      });
 
-      record.name = normalizedInput.name;
-
-      record.type = normalizedInput.type;
-
-      record.parentId = normalizedInput.parentId ?? null;
-
-      record.allowPosting = normalizedInput.allowPosting;
-
-      record.isCashAccount = normalizedInput.isCashAccount;
-
-      record.isActive = true;
+      await this.database.batch(account);
+      return this.toData(account);
     });
-
-    await this.database.batch(account);
-
-    return this.toData(account);
   }
 
   async update(
@@ -170,10 +142,7 @@ export class WatermelonChartOfAccountRepository
     input: UpdateChartOfAccountInput,
   ): Promise<ChartOfAccountData> {
     const normalizedId = id.trim();
-
-    if (!normalizedId) {
-      throw new Error("معرف الحساب مطلوب.");
-    }
+    if (!normalizedId) throw new Error("معرف الحساب مطلوب.");
 
     const account = await this.accounts.find(normalizedId);
 
@@ -182,7 +151,6 @@ export class WatermelonChartOfAccountRepository
     }
 
     const hasChildren = await this.hasChildren(account.id);
-
     if (input.allowPosting === true && hasChildren) {
       throw new Error(
         "لا يمكن جعل الحساب قابلاً للترحيل لأنه يحتوي على حسابات فرعية.",
@@ -193,114 +161,76 @@ export class WatermelonChartOfAccountRepository
       throw new Error("الحساب النقدي يجب أن يكون من نوع الأصول.");
     }
 
-    await this.database.batch(
-      account.prepareUpdate((record: { name: string; allowPosting: boolean; isCashAccount: boolean; isActive: boolean; }) => {
-        if (input.name !== undefined) {
-          record.name = input.name.trim();
-        }
-
-        if (input.allowPosting !== undefined) {
-          record.allowPosting = input.allowPosting;
-        }
-
-        if (input.isCashAccount !== undefined) {
-          record.isCashAccount = input.isCashAccount;
-        }
-
-        if (input.isActive !== undefined) {
-          record.isActive = input.isActive;
-        }
-      }),
-    );
-
-    return this.toData(account);
+    // ✅ إصلاح معماري: تغليف الـ batch داخل database.write
+    return await this.database.write(async () => {
+      await this.database.batch(
+        account.prepareUpdate((record: any) => {
+          if (input.name !== undefined) record.name = input.name.trim();
+          if (input.allowPosting !== undefined)
+            record.allowPosting = input.allowPosting;
+          if (input.isCashAccount !== undefined)
+            record.isCashAccount = input.isCashAccount;
+          if (input.isActive !== undefined) record.isActive = input.isActive;
+        }),
+      );
+      return this.toData(account);
+    });
   }
 
   async deactivate(id: string): Promise<ChartOfAccountData> {
-    const normalizedId = id.trim();
+    const account = await this.accounts.find(id.trim());
+    if (!account.isActive) return this.toData(account);
 
-    if (!normalizedId) {
-      throw new Error("معرف الحساب مطلوب.");
-    }
-
-    const account = await this.accounts.find(normalizedId);
-
-    if (!account.isActive) {
+    return await this.database.write(async () => {
+      await this.database.batch(
+        account.prepareUpdate((record: any) => {
+          record.isActive = false;
+        }),
+      );
       return this.toData(account);
-    }
-
-    await this.database.batch(
-      account.prepareUpdate((record: { isActive: boolean; }) => {
-        record.isActive = false;
-      }),
-    );
-
-    return this.toData(account);
+    });
   }
 
   async activate(id: string): Promise<ChartOfAccountData> {
-    const normalizedId = id.trim();
+    const account = await this.accounts.find(id.trim());
+    if (account.isActive) return this.toData(account);
 
-    if (!normalizedId) {
-      throw new Error("معرف الحساب مطلوب.");
-    }
-
-    const account = await this.accounts.find(normalizedId);
-
-    if (account.isActive) {
+    return await this.database.write(async () => {
+      await this.database.batch(
+        account.prepareUpdate((record: any) => {
+          record.isActive = true;
+        }),
+      );
       return this.toData(account);
-    }
-
-    await this.database.batch(
-      account.prepareUpdate((record: { isActive: boolean; }) => {
-        record.isActive = true;
-      }),
-    );
-
-    return this.toData(account);
+    });
   }
 
   private validateCreateInput(
     input: CreateChartOfAccountInput,
   ): CreateChartOfAccountInput {
     const code = this.normalizeCode(input.code);
-
     const name = input.name?.trim();
 
-    if (!name) {
-      throw new Error("اسم الحساب مطلوب.");
-    }
-
-    if (!code) {
-      throw new Error("كود الحساب مطلوب.");
-    }
-
-    if (input.allowPosting !== true && input.allowPosting !== false) {
+    if (!name) throw new Error("اسم الحساب مطلوب.");
+    if (!code) throw new Error("كود الحساب مطلوب.");
+    if (input.allowPosting !== true && input.allowPosting !== false)
       throw new Error("قيمة allowPosting غير صالحة.");
-    }
-
-    if (input.isCashAccount !== true && input.isCashAccount !== false) {
+    if (input.isCashAccount !== true && input.isCashAccount !== false)
       throw new Error("قيمة isCashAccount غير صالحة.");
-    }
 
     this.validateCashAccountRelation(input.isCashAccount, input.type);
-
-    const parentId = input.parentId?.trim() || undefined;
 
     return {
       code,
       name,
       type: input.type,
-      parentId,
+      parentId: input.parentId?.trim() || undefined,
       allowPosting: input.allowPosting,
       isCashAccount: input.isCashAccount,
     };
   }
 
-  private validateCashAccountRelation(
-    isCashAccount: boolean,
-    type: ChartOfAccountData["type"],
-  ): void {
+  private validateCashAccountRelation(isCashAccount: boolean, type: any): void {
     if (isCashAccount && type !== ACCOUNT_TYPES.ASSET) {
       throw new Error("الحساب النقدي يجب أن يكون من نوع الأصول.");
     }
@@ -310,17 +240,12 @@ export class WatermelonChartOfAccountRepository
     const children = await this.accounts
       .query(Q.where("parent_id", accountId), Q.take(1))
       .fetch();
-
     return children.length > 0;
   }
 
   private async getRequiredAccount(id: string): Promise<ChartOfAccountData> {
     const account = await this.getById(id);
-
-    if (!account) {
-      throw new Error("الحساب الأب غير موجود.");
-    }
-
+    if (!account) throw new Error("الحساب الأب غير موجود.");
     return account;
   }
 
@@ -334,10 +259,7 @@ export class WatermelonChartOfAccountRepository
       code: account.code,
       name: account.name,
       type: account.type,
-      parentId:
-        account.parentId === null || account.parentId === undefined
-          ? undefined
-          : account.parentId,
+      parentId: account.parentId ?? undefined,
       allowPosting: account.allowPosting,
       isCashAccount: account.isCashAccount,
       isActive: account.isActive,

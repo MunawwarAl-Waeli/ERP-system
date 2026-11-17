@@ -1,10 +1,10 @@
-import { database, ProductUnit, SalesInvoice } from "src/database";
+﻿import { database, ProductUnit, SalesInvoice } from "src/database";
 import Customer from "src/database/models/Customer";
 import Product from "src/database/models/Product";
-import JournalEntry from "src/database/models/JournalEntry"; // 👈 استبدال CreditEntry بـ JournalEntry
+import JournalEntry from "src/database/models/JournalEntry"; // ðŸ‘ˆ Ø§Ø³ØªØ¨Ø¯Ø§Ù„ CreditEntry Ø¨Ù€ JournalEntry
 import JournalEntryLine from "src/database/models/JournalEntryLine";
 import ChartOfAccount from "src/database/models/ChartOfAccount";
-import SalesInvoiceItem from "src/database/models/SalesInvoiceItem"; // 👈 استبدال BillItem بـ SalesInvoiceItem
+import SalesInvoiceItem from "src/database/models/SalesInvoiceItem"; // ðŸ‘ˆ Ø§Ø³ØªØ¨Ø¯Ø§Ù„ BillItem Ø¨Ù€ SalesInvoiceItem
 import { Q } from "@nozbe/watermelondb";
 import { BILL_STATUSES } from "@core/constants";
 import { formatDate } from "@shared/utils/date";
@@ -23,10 +23,10 @@ import {
 const salesInvoicesCollection = database.get<SalesInvoice>("sales_invoices");
 const customersCollection = database.get<Customer>("customers");
 const productsCollection = database.get<Product>("products");
-const journalEntriesCollection = database.get<JournalEntry>("journal_entries"); // 👈 تحديث الجدول
+const journalEntriesCollection = database.get<JournalEntry>("journal_entries"); // ðŸ‘ˆ ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø¬Ø¯ÙˆÙ„
 const salesInvoiceItemsCollection = database.get<SalesInvoiceItem>(
   "sales_invoice_items",
-); // 👈 تحديث الجدول
+); // ðŸ‘ˆ ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø¬Ø¯ÙˆÙ„
 const journalEntryLinesCollection = database.get<JournalEntryLine>(
   "journal_entry_lines",
 );
@@ -139,14 +139,21 @@ export const reportService = {
     const entry = await journalEntriesCollection.find(entryId);
     const summary = await summarizeEntry(entry);
     const lines = await entry.lines.fetch();
+    
+    // جلب جميع الحسابات مرة واحدة للبحث فيها بدلاً من استخدام العلاقات
+    const accountsCollection = database.get("chart_of_accounts");
+    const allAccounts = await accountsCollection.query().fetch();
+    const accountsMap = new Map(allAccounts.map(a => [a.id, a]));
+
     const detailedLines = await Promise.all(
       lines.map(async (line) => {
-        const account = await line.account.fetch();
+        // البحث المباشر عن الحساب باستخدام ID
+        const account = accountsMap.get(line.accountId);
         return {
           id: line.id,
           accountId: line.accountId,
-          accountCode: account.code,
-          accountName: account.name,
+          accountCode: account ? account.code : "???",
+          accountName: account ? account.name : "حساب غير معروف",
           debit: line.debit,
           credit: line.credit,
         };
@@ -341,7 +348,7 @@ export const reportService = {
       .query(Q.where("is_active", true))
       .fetch();
 
-    // 👈 جلب جدول الوحدات لربط اسم الوحدة بالمنتج
+    // ðŸ‘ˆ Ø¬Ù„Ø¨ Ø¬Ø¯ÙˆÙ„ Ø§Ù„ÙˆØ­Ø¯Ø§Øª Ù„Ø±Ø¨Ø· Ø§Ø³Ù… Ø§Ù„ÙˆØ­Ø¯Ø© Ø¨Ø§Ù„Ù…Ù†ØªØ¬
     const productUnitsCollection = database.get<ProductUnit>("product_units");
 
     const productInfos: ProductStockInfo[] = [];
@@ -352,7 +359,7 @@ export const reportService = {
       const isLowStock = currentStock <= p.minStock;
       const isOutOfStock = currentStock <= 0;
 
-      // جلب الوحدة الافتراضية للمنتج من جدول product_units
+      // Ø¬Ù„Ø¨ Ø§Ù„ÙˆØ­Ø¯Ø© Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠØ© Ù„Ù„Ù…Ù†ØªØ¬ Ù…Ù† Ø¬Ø¯ÙˆÙ„ product_units
       const units = await productUnitsCollection
         .query(Q.where("product_id", p.id), Q.take(1))
         .fetch();
@@ -361,9 +368,9 @@ export const reportService = {
       productInfos.push({
         id: p.id,
         name: p.name,
-        category: "", // يمكنك جلب اسم التصنيف أيضاً إذا رغبت
+        category: "", // ÙŠÙ…ÙƒÙ†Ùƒ Ø¬Ù„Ø¨ Ø§Ø³Ù… Ø§Ù„ØªØµÙ†ÙŠÙ Ø£ÙŠØ¶Ø§Ù‹ Ø¥Ø°Ø§ Ø±ØºØ¨Øª
         currentStock,
-        unit: unitName, // 👈 تمرير اسم الوحدة الحقيقي هنا بدلاً من النص الفارغ
+        unit: unitName, // ðŸ‘ˆ ØªÙ…Ø±ÙŠØ± Ø§Ø³Ù… Ø§Ù„ÙˆØ­Ø¯Ø© Ø§Ù„Ø­Ù‚ÙŠÙ‚ÙŠ Ù‡Ù†Ø§ Ø¨Ø¯Ù„Ø§Ù‹ Ù…Ù† Ø§Ù„Ù†Øµ Ø§Ù„ÙØ§Ø±Øº
         purchasePrice,
         sellingPrice: 0,
         stockValue: currentStock * purchasePrice,
@@ -408,7 +415,7 @@ export const reportService = {
       return [];
     }
 
-    // 👈 التصحيح هنا: استخدام sales_invoice_id بدلاً من bill_id
+    // ðŸ‘ˆ Ø§Ù„ØªØµØ­ÙŠØ­ Ù‡Ù†Ø§: Ø§Ø³ØªØ®Ø¯Ø§Ù… sales_invoice_id Ø¨Ø¯Ù„Ø§Ù‹ Ù…Ù† bill_id
     const invoiceItems = await salesInvoiceItemsCollection
       .query(Q.where("sales_invoice_id", Q.oneOf(invoiceIds)))
       .fetch();
@@ -416,9 +423,9 @@ export const reportService = {
     const performanceMap = new Map<string, ProductPerformanceData>();
 
     invoiceItems.forEach((item: SalesInvoiceItem) => {
-      // ملاحظة: بما أن النموذج لا يحتوي على حقل productName بشكل مباشر (بل يعتمد على العلاقة product)،
-      // تأكد من جلب الاسم أو التعامل معه بحذر. إذا كان الجدول أو الـ item يحفظ الاسم، استمر هكذا،
-      // وإلا يمكنك استخدام item.product?.name إذا تم عمل fetch للعلاقات.
+      // Ù…Ù„Ø§Ø­Ø¸Ø©: Ø¨Ù…Ø§ Ø£Ù† Ø§Ù„Ù†Ù…ÙˆØ°Ø¬ Ù„Ø§ ÙŠØ­ØªÙˆÙŠ Ø¹Ù„Ù‰ Ø­Ù‚Ù„ productName Ø¨Ø´ÙƒÙ„ Ù…Ø¨Ø§Ø´Ø± (Ø¨Ù„ ÙŠØ¹ØªÙ…Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø¹Ù„Ø§Ù‚Ø© product)ØŒ
+      // ØªØ£ÙƒØ¯ Ù…Ù† Ø¬Ù„Ø¨ Ø§Ù„Ø§Ø³Ù… Ø£Ùˆ Ø§Ù„ØªØ¹Ø§Ù…Ù„ Ù…Ø¹Ù‡ Ø¨Ø­Ø°Ø±. Ø¥Ø°Ø§ ÙƒØ§Ù† Ø§Ù„Ø¬Ø¯ÙˆÙ„ Ø£Ùˆ Ø§Ù„Ù€ item ÙŠØ­ÙØ¸ Ø§Ù„Ø§Ø³Ù…ØŒ Ø§Ø³ØªÙ…Ø± Ù‡ÙƒØ°Ø§ØŒ
+      // ÙˆØ¥Ù„Ø§ ÙŠÙ…ÙƒÙ†Ùƒ Ø§Ø³ØªØ®Ø¯Ø§Ù… item.product?.name Ø¥Ø°Ø§ ØªÙ… Ø¹Ù…Ù„ fetch Ù„Ù„Ø¹Ù„Ø§Ù‚Ø§Øª.
       const productId = (item as any).product?.id ?? (item as any).productId ?? "unknown";
       const existing = performanceMap.get(productId);
 
@@ -428,7 +435,7 @@ export const reportService = {
       } else {
         performanceMap.set(productId, {
           id: productId,
-          name: "Product", // أو اسم المنتج المرتبط إذا كان متاحاً
+          name: "Product", // Ø£Ùˆ Ø§Ø³Ù… Ø§Ù„Ù…Ù†ØªØ¬ Ø§Ù„Ù…Ø±ØªØ¨Ø· Ø¥Ø°Ø§ ÙƒØ§Ù† Ù…ØªØ§Ø­Ø§Ù‹
           quantitySold: item.quantity,
           revenue: item.total,
         });
@@ -440,3 +447,5 @@ export const reportService = {
     );
   },
 };
+
+

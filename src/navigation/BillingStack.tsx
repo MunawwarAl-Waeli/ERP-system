@@ -2,7 +2,7 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { BillingStackParamList } from "./types";
 import { BillingScreen } from "src/application/features/sales/screens/BillingScreen";
-import { SalesInvoiceDetailScreen } from "src/application/features/sales/screens/BillPreviewScreen";
+import { SalesInvoiceDetailScreen } from "src/application/features/sales/screens/SalesInvoiceDetailScreen";
 import { SalesInvoiceHistoryScreen } from "src/application/features/sales/screens/SalesInvoiceHistoryScreen";
 
 const Stack = createNativeStackNavigator<BillingStackParamList>();

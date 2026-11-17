@@ -13,7 +13,7 @@ export const migrations = schemaMigrations({
   migrations: [
     {
       toVersion: 3,
-      steps:[],
+      steps: [],
     },
     {
       toVersion: 4,
@@ -90,7 +90,28 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      toVersion: 7,
+      steps: [
+        addColumns({
+          table: "sales_invoices",
+          columns: [
+            { name: "service_fee", type: "number" },
+            { name: "discount_total", type: "number" },
+          ],
+        }),
+        addColumns({
+          table: "accounting_settings",
+          columns: [
+            {
+              name: "service_revenue_account_id",
+              type: "string",
+              isOptional: true,
+              isIndexed: true,
+            },
+          ],
+        }),
+      ],
+    },
   ],
 });
-
-

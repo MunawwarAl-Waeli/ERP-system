@@ -42,6 +42,7 @@ export const BillingScreen: React.FC<{ navigation: NavigationProp }> = ({
     removeFromCart,
     setPaymentType,
     setServiceFee,
+    setBillDiscount,
     clearCart,
     partialPaidAmount,
     setPartialPaidAmount,
@@ -92,12 +93,15 @@ export const BillingScreen: React.FC<{ navigation: NavigationProp }> = ({
         invoiceDate: new Date().toISOString().slice(0, 10),
         paymentType,
         paidAmount,
+        discountTotal, // ✅ إرسال الخصم
+        serviceFee,    // ✅ إرسال أجور الخدمة
         createdBy: "local-user",
         items: cartItems.map((item) => ({
           productId: item.productId,
           productUnitId: item.productUnitId,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
+          discount: item.discount || 0, // ✅ إرسال خصم البند
         })),
       });
 
@@ -175,27 +179,49 @@ export const BillingScreen: React.FC<{ navigation: NavigationProp }> = ({
       quantity: number;
     }>,
   ) => {
-    for (const { product, productUnitId, quantity } of items) {
-      try {
-        const fullProduct = await services.product.getById(product.id);
-        const units = fullProduct?.units || [];
-        const unit = units.find((u) => u.id === productUnitId);
+    setIsLoading(true);
+    try {
+      // ✅ استخدام Promise.all لجلب المنتجات بالتوازي (أسرع بكثير)
+      const validItems = await Promise.all(
+        items.map(async ({ product, productUnitId, quantity }) => {
+          try {
+            const fullProduct = await services.product.getById(product.id);
+            if (!fullProduct) return null;
 
-        const unitData = unit ? await services.unit.getById(unit.unitId) : null;
-        const unitName = unitData?.name || t("unit");
+            // ✅ التحقق من كفاية المخزون
+            const stock = await inventoryRepository.getProductStock(product.id);
+            if (stock < quantity) {
+              notify.warning(t("insufficientStock", { name: product.name }) ||" المخزون غير كافٍ للمنتج:" );
+              return null;
+            }
 
-        addToCart({
-          productId: product.id,
-          productUnitId,
-          productName: product.name,
-          unitName,
-          quantity,
-          unitPrice: unit?.salePrice || 0,
-          discount: 0,
-        });
-      } catch {
-        // المنتج محذوف — تجاهل
-      }
+            const units = fullProduct.units || [];
+            const unit = units.find((u) => u.id === productUnitId);
+            if (!unit) return null;
+
+            const unitData = await services.unit.getById(unit.unitId);
+            
+            return {
+              productId: product.id,
+              productUnitId,
+              productName: product.name,
+              unitName: unitData?.name || t("unit"),
+              quantity,
+              unitPrice: unit.salePrice || 0,
+              discount: 0,
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      // إضافة المنتجات الصالحة فقط للسلة
+      validItems.forEach((item) => {
+        if (item) addToCart(item);
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -276,15 +302,27 @@ export const BillingScreen: React.FC<{ navigation: NavigationProp }> = ({
             </View>
           )}
 
-          <View style={styles.serviceFeeContainer}>
-            <TextInput
-              label={t("serviceFee") || "أجور الخدمات"}
-              value={serviceFee ? serviceFee.toString() : ""}
-              onChangeText={(text) => setServiceFee(parseFloat(text) || 0)}
-              keyboardType="numeric"
-              mode="outlined"
-              style={styles.serviceFeeInput}
-            />
+          <View style={{ flexDirection: "row", paddingHorizontal: 16, marginBottom: 8, gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <TextInput
+                label={t("serviceFee") || "أجور الخدمات"}
+                value={serviceFee ? serviceFee.toString() : ""}
+                onChangeText={(text) => setServiceFee(parseFloat(text) || 0)}
+                keyboardType="numeric"
+                mode="outlined"
+                style={styles.serviceFeeInput}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <TextInput
+                label={t("discount") || "الخصم"}
+                value={discountTotal ? discountTotal.toString() : ""}
+                onChangeText={(text) => setBillDiscount(parseFloat(text) || 0)}
+                keyboardType="numeric"
+                mode="outlined"
+                style={styles.serviceFeeInput}
+              />
+            </View>
           </View>
 
           <CartSummary
@@ -355,3 +393,5 @@ const styles = StyleSheet.create({
   customerButton: { flex: 1 },
   createButton: { flex: 1 },
 });
+
+

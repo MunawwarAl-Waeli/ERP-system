@@ -73,7 +73,6 @@ import {
   FlaskConical,
   Drumstick,
   Container,
-  type LucideProps,
   Folder,
   PlusCircle,
   Landmark,
@@ -94,175 +93,53 @@ import {
   ShieldCheck,
   Network,
   Wallet,
+  MessageCircle,
+  MessageSquare,
+  type LucideProps,
 } from "lucide-react-native";
 
-// Map from MaterialCommunityIcons names â†’ Lucide components
 const iconMap: Record<string, React.FC<LucideProps>> = {
-  // Navigation
+  // Navigation & Core
   "view-dashboard": LayoutDashboard,
   "account-group": Users,
+  users: Users,
   receipt: Receipt,
   "package-variant-closed": PackageOpen,
   "package-variant": Package,
   "dots-horizontal": MoreHorizontal,
   "dots-vertical": MoreVertical,
   "more-vertical": MoreVertical,
-  "dots-vertical-circle": MoreVertical,
 
-  // Dashboard / Reports
-  "chart-line": TrendingUp,
-  "account-cash": HandCoins,
-  "chart-bar": BarChart3,
-  "chevron-right": ChevronRight,
-  "chevron-down": ChevronDown,
-  "chevron-left": ChevronLeft,
-  "arrow-left": ArrowLeft,
-  "arrow-up": ArrowUp,
-  "arrow-down": ArrowDown,
-  "arrow-up-down": ArrowUpDown,
-  sort: ArrowUpDown,
-  "menu-down": ChevronDown,
-  // More Menu
-  "truck-delivery": Truck,
-  "cart-plus": ShoppingCart,
-  "vector-arrange-after": ArrowDownUp,
-  calculator: Calculator,
-  "book-open-outline": BookOpen,
-  "book-account-outline": BookUser,
-
-  // Accounting documents
-  "file-document-outline": FileText,
-  "receipt-text-outline": ReceiptText,
-  "cash-minus": WalletCards,
-
-  // Management
-  "folder-outline": FolderOpen,
-  "shield-check-outline": ShieldCheck,
-  // Products
-  tag: Tag,
-  barcode: Barcode,
-
-  // Alerts
-  "alert-circle": AlertCircle,
-  "alert-triangle": AlertTriangle,
-  info: Info,
-
-  // Customers
-  phone: Phone,
-  "map-marker": MapPin,
-  "note-text": StickyNote,
-
-  // Auth
-  "backspace-outline": Delete,
-
-  // Settings
-  cog: Settings,
-  printer: Printer,
-  "lock-reset": LockKeyhole,
-
-  // Backup
-  export: Upload,
-  import: Download,
-
-  // Actions
+  // Actions & Controls
   close: X,
   x: X,
   plus: Plus,
   minus: Minus,
   "account-plus": UserPlus,
-  "cash-plus": BadgeIndianRupee,
-  "delete-sweep": Trash2,
   delete: Trash2,
   "trash-2": Trash2,
   pencil: Pencil,
-  percent: Percent,
-  "percent-outline": Percent,
   check: Check,
-
-  // Billing
-  magnify: Search,
-  search: Search,
-  cash: Banknote,
-  cellphone: Smartphone,
-  "credit-card": CreditCard,
-  "account-clock": Clock,
-  calendar: Calendar,
-  "calendar-outline": Calendar,
-  "cart-outline": ShoppingCart,
-  account: User,
-  user: User,
-  history: History,
-  "plus-minus": Plus,
-  "share-variant": Share2,
-
-  // Printing
-  bluetooth: Bluetooth,
-
-  // Documents
-  "file-text": FileText,
-
-  // Misc
-  "check-circle-outline": CheckCircle2,
-
-  // Password visibility
-  eye: Eye,
-  "eye-off": EyeOff,
-  "eye-outline": Eye,
-  "eye-off-outline": EyeOff,
-
-  // Google Drive / Sync
-  cloud: Cloud,
-  "log-in": LogIn,
-  "log-out": LogOut,
-  "refresh-cw": RefreshCw,
-
-  // Data
-  database: Database,
-
-  // Status
   "check-circle": CheckCircle2,
-
-  // Product Categories (kirana store)
-  coffee: Coffee,
-  cookie: Cookie,
-  "cup-water": CupSoda,
-  grain: Wheat,
-  barley: Wheat,
-  peanut: Nut,
-  cow: Milk,
-  "bottle-tonic": FlaskConical,
-  "food-drumstick": Drumstick,
-  "face-man-shimmer": Sparkles,
-  candle: Flame,
-  "food-variant": UtensilsCrossed,
-  "hand-wash": Droplets,
-  "shaker-outline": Container,
-  "cube-outline": Box,
-
-  // Accounting
-  "plus-circle": PlusCircle,
-  "pencil-outline": Pencil,
-
-  folder: Folder,
-
-  landmark: Landmark,
-
-  scale: Scale,
-  "scale-balance": Scale,
-
-  shield: Shield,
-  "shield-account": Shield,
-
-  "trending-down": TrendingDown,
-
+  "check-circle-outline": CheckCircle2,
   square: Square,
   "checkbox-blank": Square,
   "minus-square": MinusSquare,
-  // Accounting form
-  "wallet-outline": Wallet,
-  "credit-card-outline": CreditCard,
-  "trending-up": TrendingUp,
-  sitemap: Network,
+  cog: Settings,
+  settings: Settings,
+
+  // Communication & Media
+  phone: Phone,
+  whatsapp: MessageCircle,
+  sms: MessageSquare,
+  "file-pdf-box": FileText,
+  "file-text": FileText,
+
+  // Filters & Status Icons
+  magnify: Search,
+  search: Search,
+  filter: ArrowUpDown,
+  "alert-circle": AlertCircle,
 };
 
 export interface AppIconProps {
@@ -272,13 +149,9 @@ export interface AppIconProps {
   style?: object;
 }
 
-/**
- * Drop-in replacement for react-native-vector-icons Icon.
- * Uses Lucide SVG icons â€” no native font linking needed.
- */
 export const AppIcon: React.FC<AppIconProps> = ({
   name,
-  size = 24,
+  size = 20,
   color,
   style,
 }) => {
@@ -290,14 +163,8 @@ export const AppIcon: React.FC<AppIconProps> = ({
   return <LucideComponent size={size} color={color} style={style} />;
 };
 
-/**
- * Helper for React Native Paper's icon prop.
- * Usage: icon={paperIcon('receipt')}
- */
 export const paperIcon = (name: string) => {
   return ({ size, color }: { size: number; color: string }) => (
     <AppIcon name={name} size={size} color={color} />
   );
 };
-
-
