@@ -22,7 +22,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { createMMKV, type MMKV } from "react-native-mmkv";
 
 import { AppHeader } from "@shared/components/AppHeader";
-import { SearchInput } from "@shared/components/SearchInput";
 import { EmptyState } from "@shared/components/EmptyState";
 import { LoadingOverlay } from "@shared/components/LoadingOverlay";
 import { AppIcon } from "src/shared/components/Icon";
@@ -34,6 +33,8 @@ import { useBillingStore } from "src/application/features/sales/store/useBilling
 import { customerPdfService } from "../services/customerPdfService";
 import { notify } from "@shared/notifications";
 import { Colors } from "src/core/theme/colors";
+import { CustomerFormModal } from "../components/CustomerFormModal";
+import { CustomerLedgerModal } from "../components/CustomerLedgerModal";
 
 // ========================================
 // Safe Storage Helper (MMKV)
@@ -92,7 +93,7 @@ export const CustomerListScreen: React.FC<{
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("ALL");
 
-  // ✅ جلب البيانات والأرصدة عبر الهوكات النظيفة فقط دون خرق المعمارية
+  // ✅ جلب البيانات والأرصدة عبر الهوكات النظيفة فقط
   const { customers, isLoading } = useCustomers(searchQuery);
   const { creditMap } = useCustomerCredits();
 
@@ -104,6 +105,10 @@ export const CustomerListScreen: React.FC<{
 
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showTemplateSettings, setShowTemplateSettings] = useState(false);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<
+    string | undefined
+  >();
 
   const [whatsappTemplate, setWhatsappTemplate] = useState<string>(() =>
     getStoredTemplate(
@@ -130,24 +135,34 @@ export const CustomerListScreen: React.FC<{
     setPage(1);
   }, [searchQuery, filterType]);
 
+  type FilterType = "ALL" | "DEBT" | "ADVANCE" | "BALANCED";
+
+  // تصفية القائمة حسب حالة الحساب الحقيقية
   const filteredCustomers = useMemo(() => {
     return customers.filter((customer) => {
       const credit = creditMap[customer.id] || 0;
       if (filterType === "DEBT") return credit > 0;
-      if (filterType === "BALANCED") return credit <= 0;
+      if (filterType === "ADVANCE") return credit < 0;
+      if (filterType === "BALANCED") return credit === 0;
       return true;
     });
   }, [customers, creditMap, filterType]);
 
+  // حساب الإحصائيات الدقيقة (إجمالي الديون وإجمالي الدفعات المقدمة)
   const statistics = useMemo(() => {
     let totalDebt = 0;
+    let totalAdvance = 0;
     let debtorsCount = 0;
+    let advanceCount = 0;
 
     filteredCustomers.forEach((c) => {
       const credit = creditMap[c.id] || 0;
       if (credit > 0) {
         totalDebt += credit;
         debtorsCount += 1;
+      } else if (credit < 0) {
+        totalAdvance += Math.abs(credit);
+        advanceCount += 1;
       }
     });
 
@@ -155,6 +170,8 @@ export const CustomerListScreen: React.FC<{
       totalCustomers: filteredCustomers.length,
       totalDebt,
       debtorsCount,
+      totalAdvance,
+      advanceCount,
     };
   }, [filteredCustomers, creditMap]);
 
@@ -167,6 +184,15 @@ export const CustomerListScreen: React.FC<{
       setPage((prev) => prev + 1);
     }
   };
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [selectedLedgerCustomer, setSelectedLedgerCustomer] =
+    useState<Customer | null>(null);
+
+  // دالة فتح النافذة
+  const handleOpenLedger = useCallback((customer: Customer) => {
+    setSelectedLedgerCustomer(customer);
+    setShowLedgerModal(true);
+  }, []);
 
   const handleCall = useCallback((phone: string) => {
     Linking.openURL(`tel:${phone}`);
@@ -303,7 +329,7 @@ export const CustomerListScreen: React.FC<{
           onCall={item.phone ? () => handleCall(item.phone) : undefined}
           onWhatsapp={() => handleWhatsapp(item)}
           onSms={() => handleSms(item)}
-          onPdf={() => handleSharePdf(item)}
+          onPdf={() => handleOpenLedger(item)}
         />
       );
     },
@@ -331,10 +357,11 @@ export const CustomerListScreen: React.FC<{
     [isBulkMode, selectedIds.size, filteredCustomers.length],
   );
 
-  // 2. تثبيت دوال الضغط لمنع إتلاف مراجع الأزرار
-  const handleOpenForm = useCallback(() => {
-    navigation.navigate("CustomerForm");
-  }, [navigation]);
+  // 2. تثبيت دوال الضغط لمنع إتلاف مراجع الأزرار أثناء البحث (تمت إضافة [] المصححة)
+  const handleOpenAddModal = useCallback(() => {
+    setSelectedCustomerId(undefined);
+    setShowCustomerModal(true);
+  }, []);
 
   const handleOpenSettings = useCallback(() => {
     setShowTemplateSettings(true);
@@ -369,7 +396,7 @@ export const CustomerListScreen: React.FC<{
       },
       {
         icon: "plus",
-        onPress: handleOpenForm,
+        onPress: handleOpenAddModal,
       },
     ];
   }, [
@@ -379,10 +406,10 @@ export const CustomerListScreen: React.FC<{
     toggleSearch,
     handleOpenSettings,
     handleEnableBulk,
-    handleOpenForm,
+    handleOpenAddModal,
   ]);
 
-  // ✅ السطر المعدل: يمنع إعادة رسم الشاشة بالكامل عند البحث وتحديث القائمة في مكانها بـ FlashList
+  // يمنع إعادة رسم الشاشة بالكامل عند البحث وتحديث القائمة في مكانها بـ FlashList
   if (isLoading && customers.length === 0) {
     return <LoadingOverlay visible />;
   }
@@ -440,19 +467,11 @@ export const CustomerListScreen: React.FC<{
         )}
 
         {/* شريط الفلاتر الكبسولية مع مساحة تفصلها عن البحث */}
+        {/* شريط الفلاتر الأربعة */}
         <View style={styles.chipsRow}>
           <Chip
             selected={filterType === "ALL"}
             onPress={() => setFilterType("ALL")}
-            icon={() => (
-              <AppIcon
-                name="users"
-                size={14}
-                color={
-                  filterType === "ALL" ? Colors.onPrimary : Colors.onSurface
-                }
-              />
-            )}
             style={[
               styles.filterChip,
               {
@@ -462,25 +481,15 @@ export const CustomerListScreen: React.FC<{
             ]}
             textStyle={{
               color: filterType === "ALL" ? Colors.onPrimary : Colors.onSurface,
-              fontSize: 11.5,
-              fontWeight: "bold",
+              fontSize: 11,
             }}
           >
-            الكل ({filteredCustomers.length})
+            الكل ({customers.length})
           </Chip>
 
           <Chip
             selected={filterType === "DEBT"}
             onPress={() => setFilterType("DEBT")}
-            icon={() => (
-              <AppIcon
-                name="alert-circle"
-                size={14}
-                color={
-                  filterType === "DEBT" ? Colors.creditRed : Colors.onSurface
-                }
-              />
-            )}
             style={[
               styles.filterChip,
               {
@@ -493,19 +502,33 @@ export const CustomerListScreen: React.FC<{
             textStyle={{
               color:
                 filterType === "DEBT" ? Colors.creditRed : Colors.onSurface,
-              fontSize: 11.5,
-              fontWeight: "bold",
+              fontSize: 11,
             }}
           >
             عليها ديون ({statistics.debtorsCount})
           </Chip>
 
           <Chip
+            selected={filterType === "ADVANCE"}
+            onPress={() => setFilterType("ADVANCE")}
+            style={[
+              styles.filterChip,
+              {
+                backgroundColor:
+                  filterType === "ADVANCE" ? "#E8F5E9" : Colors.surfaceVariant,
+              },
+            ]}
+            textStyle={{
+              color: filterType === "ADVANCE" ? "#2E7D32" : Colors.onSurface,
+              fontSize: 11,
+            }}
+          >
+            له رصيد مقدم ({statistics.advanceCount})
+          </Chip>
+
+          <Chip
             selected={filterType === "BALANCED"}
             onPress={() => setFilterType("BALANCED")}
-            icon={() => (
-              <AppIcon name="check-circle" size={14} color={Colors.onSurface} />
-            )}
             style={[
               styles.filterChip,
               {
@@ -515,14 +538,50 @@ export const CustomerListScreen: React.FC<{
                     : Colors.surfaceVariant,
               },
             ]}
-            textStyle={{
-              color: Colors.onSurface,
-              fontSize: 11.5,
-              fontWeight: "bold",
-            }}
+            textStyle={{ color: Colors.onSurface, fontSize: 11 }}
           >
-            حسابات متوازنة
+            متوازن
           </Chip>
+        </View>
+
+        {/* شريط الإحصائيات المحدث */}
+        <View style={styles.statsStrip}>
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>إجمالي ديون العملاء</Text>
+            <Text
+              style={[
+                styles.statValue,
+                { color: Colors.creditRed, writingDirection: "ltr" },
+              ]}
+            >
+              {statistics.totalDebt.toLocaleString("en-US")}{" "}
+              <Text style={styles.statCurrency}>ر.ي</Text>
+            </Text>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>إجمالي الدفعات المقدمة</Text>
+            <Text
+              style={[
+                styles.statValue,
+                { color: "#2E7D32", writingDirection: "ltr" },
+              ]}
+            >
+              {statistics.totalAdvance.toLocaleString("en-US")}{" "}
+              <Text style={styles.statCurrency}>ر.ي</Text>
+            </Text>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>العملاء المطابقون</Text>
+            <Text style={[styles.statValue, { color: Colors.primary }]}>
+              {statistics.totalCustomers}
+            </Text>
+          </View>
         </View>
 
         {/* شريط الإحصائيات الهادئ والمتباعد */}
@@ -583,7 +642,7 @@ export const CustomerListScreen: React.FC<{
               title="لا يوجد عملاء"
               subtitle="لم يتم العثور على أي نتائج تطابق البحث أو الفلتر"
               actionLabel="إضافة عميل جديد"
-              onAction={() => navigation.navigate("CustomerForm")}
+              onAction={handleOpenAddModal}
             />
           }
         />
@@ -693,6 +752,20 @@ export const CustomerListScreen: React.FC<{
           </Dialog.Actions>
         </Dialog>
       </Portal>
+
+      <CustomerFormModal
+        visible={showCustomerModal}
+        onDismiss={() => setShowCustomerModal(false)}
+        customerId={selectedCustomerId}
+      />
+      <CustomerLedgerModal
+        visible={showLedgerModal}
+        onDismiss={() => setShowLedgerModal(false)}
+        customer={selectedLedgerCustomer}
+        currentBalance={
+          selectedLedgerCustomer ? creditMap[selectedLedgerCustomer.id] || 0 : 0
+        }
+      />
     </SafeAreaView>
   );
 };
@@ -711,8 +784,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-
-  // 1. شريط البحث المنظم والمحذي للـ RTL
   searchBarWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -731,7 +802,7 @@ const styles = StyleSheet.create({
     height: 38,
   },
   searchIcon: {
-    marginLeft: 6, // مسافة صحيحة عند بداية الحقل العربي
+    marginLeft: 6,
   },
   searchInputText: {
     flex: 1,
@@ -760,8 +831,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: Colors.primary,
   },
-
-  // 2. الفلاتر الكبسولية
   chipsRow: {
     flexDirection: "row",
     gap: 6,
@@ -771,8 +840,6 @@ const styles = StyleSheet.create({
     height: 30,
     borderRadius: 6,
   },
-
-  // 3. شريط الإحصائيات المدمج
   statsStrip: {
     flexDirection: "row",
     alignItems: "center",
@@ -805,8 +872,6 @@ const styles = StyleSheet.create({
     height: 20,
     backgroundColor: Colors.border,
   },
-
-  // 4. القائمة الرئيسية والأزرار العائمة
   listWrapper: {
     flex: 1,
   },
@@ -828,8 +893,6 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: "bold",
   },
-
-  // 5. النوافذ المنبثقة (Dialogs)
   dialog: {
     borderRadius: 12,
     backgroundColor: Colors.surface,

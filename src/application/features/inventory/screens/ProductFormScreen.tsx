@@ -37,6 +37,7 @@ import {
   ProductData,
   ProductUnitData,
 } from "@core/types/products/product";
+import { BarcodeScannerModal } from "../../purchase/components/BarcodeScannerModal";
 
 interface NavigationProp {
   navigate: (screen: string, params?: Record<string, unknown>) => void;
@@ -130,9 +131,7 @@ const Picker: React.FC<{
                   setVisible(false);
                 }}
                 title={
-                  opt.sublabel
-                    ? `${opt.label} — ${opt.sublabel}`
-                    : opt.label
+                  opt.sublabel ? `${opt.label} — ${opt.sublabel}` : opt.label
                 }
                 titleStyle={
                   opt.id === value
@@ -167,7 +166,6 @@ export const ProductFormScreen: React.FC<{
   const [minStock, setMinStock] = useState("0");
   const [isActive, setIsActive] = useState(true);
 
-
   // Units
   const [pieceUnitMeta, setPieceUnitMeta] = useState<UnitData | null>(null);
   const [allUnits, setAllUnits] = useState<UnitData[]>([]);
@@ -185,6 +183,10 @@ export const ProductFormScreen: React.FC<{
     [],
   );
 
+  // 2. أضف هذه الحالات داخل المكون (تحت الحالات الأخرى)
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerTarget, setScannerTarget] = useState<string | null>(null);
+  // null = مغلق، "base" = القطعة الأساسية، tempId = وحدة إضافية
   // ─── Load initial data ───────────────────────────────────
   const loadData = useCallback(async () => {
     try {
@@ -240,7 +242,6 @@ export const ProductFormScreen: React.FC<{
         setCategoryId(product.categoryId);
         setMinStock(String(product.minStock));
         setIsActive(product.isActive);
-
 
         // Split units: piece vs additional
         const pieceUnitId = pieceUnit.id;
@@ -373,7 +374,9 @@ export const ProductFormScreen: React.FC<{
 
     // فحص مسبق: هل الـSKU مستخدم بالفعل؟
     if (sku.trim()) {
-      const existing = await services.product.getBySku(sku.trim().toUpperCase());
+      const existing = await services.product.getBySku(
+        sku.trim().toUpperCase(),
+      );
       if (existing && existing.id !== editingId) {
         notify.error(`الـSKU "${sku}" مستخدم بالفعل لمنتج آخر`);
         return;
@@ -420,9 +423,7 @@ export const ProductFormScreen: React.FC<{
       }
       navigation.goBack();
     } catch (error) {
-      notify.error(
-        error instanceof Error ? error.message : "فشل حفظ المنتج",
-      );
+      notify.error(error instanceof Error ? error.message : "فشل حفظ المنتج");
     } finally {
       setIsSaving(false);
     }
@@ -608,6 +609,15 @@ export const ProductFormScreen: React.FC<{
                 mode="outlined"
                 style={styles.input}
                 dense
+                right={
+                  <TextInput.Icon
+                    icon="barcode-scan"
+                    onPress={() => {
+                      setScannerTarget("base");
+                      setShowScanner(true);
+                    }}
+                  />
+                }
               />
             </View>
 
@@ -678,6 +688,15 @@ export const ProductFormScreen: React.FC<{
                   mode="outlined"
                   style={styles.input}
                   dense
+                  right={
+                    <TextInput.Icon
+                      icon="barcode-scan"
+                      onPress={() => {
+                        setScannerTarget(u.tempId);
+                        setShowScanner(true);
+                      }}
+                    />
+                  }
                 />
               </View>
             ))}
@@ -708,6 +727,24 @@ export const ProductFormScreen: React.FC<{
           </Button>
         </ScrollView>
       </KeyboardAvoidingView>
+      {/* ماسح الباركود */}
+      <BarcodeScannerModal
+        visible={showScanner}
+        onDismiss={() => {
+          setShowScanner(false);
+          setScannerTarget(null);
+        }}
+        onCodeScanned={(code) => {
+          if (scannerTarget === "base") {
+            setPieceUnitData((p) => ({ ...p, barcode: code }));
+          } else if (scannerTarget) {
+            updateAdditionalUnit(scannerTarget, "barcode", code);
+          }
+          setShowScanner(false);
+          setScannerTarget(null);
+          notify.success(`تم قراءة الباركود: ${code}`);
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -776,4 +813,3 @@ const styles = StyleSheet.create({
 
   saveBtn: { borderRadius: 12, marginTop: 8 },
 });
-

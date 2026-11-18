@@ -9,6 +9,7 @@ import {
   PurchaseInvoiceItemData,
 } from "@core/types/purchases/purchaseInvoice";
 import { PurchaseInvoiceRepository } from "@application/features/purchase/repositories/PurchaseInvoiceRepository";
+import ProductBatch from "src/database/models/ProductBatch";
 
 export class WatermelonPurchaseInvoiceRepository
   implements PurchaseInvoiceRepository
@@ -24,6 +25,15 @@ export class WatermelonPurchaseInvoiceRepository
     );
   }
 
+  async getBatchesByPurchaseItemIds(
+    itemIds: string[],
+  ): Promise<ProductBatch[]> {
+    if (itemIds.length === 0) return [];
+    return this.database
+      .get<ProductBatch>(ProductBatch.table)
+      .query(Q.where("purchase_item_id", Q.oneOf(itemIds)))
+      .fetch();
+  }
   // =========================================================
   // Queries
   // =========================================================
@@ -228,8 +238,6 @@ export class WatermelonPurchaseInvoiceRepository
         record.total = this.calculateTotal(input);
 
         record.createdBy = input.createdBy;
-
-        record.idempotencyKey = input.idempotencyKey ?? null;
       },
     );
 
@@ -288,10 +296,10 @@ export class WatermelonPurchaseInvoiceRepository
     const itemsCollection = this.database.get<any>("purchase_invoice_items");
     const allItems = await itemsCollection.query().fetch();
     const items = allItems.filter((i: any) => i.purchaseInvoiceId === id);
-    
+
     await this.database.batch(
       ...items.map((i: any) => i.prepareDestroyPermanently()),
-      invoice.prepareDestroyPermanently()
+      invoice.prepareDestroyPermanently(),
     );
   }
 
@@ -330,7 +338,7 @@ export class WatermelonPurchaseInvoiceRepository
   // Paid amount cache
   // =========================================================
 
-    async setPaidAmount(
+  async setPaidAmount(
     id: string,
     amount: number,
   ): Promise<PurchaseInvoiceData> {
@@ -523,5 +531,3 @@ export class WatermelonPurchaseInvoiceRepository
     return new Date(timestamp).toISOString().slice(0, 10);
   }
 }
-
-

@@ -4,6 +4,7 @@
 } from "@core/types/purchases/purchaseInvoice";
 import { DocumentStatus } from "@core/constants";
 import { database } from "src/database";
+import ProductBatch from "src/database/models/ProductBatch";
 import PurchaseInvoice from "src/database/models/PurchaseInvoice";
 import PurchaseInvoiceItem from "src/database/models/PurchaseInvoiceItem";
 import { Q } from "@nozbe/watermelondb";
@@ -54,6 +55,7 @@ export interface PurchaseInvoiceRepository {
   increasePaidAmount(id: string, amount: number): Promise<PurchaseInvoiceData>;
   setPaidAmount(id: string, amount: number): Promise<PurchaseInvoiceData>;
   decreasePaidAmount(id: string, amount: number): Promise<PurchaseInvoiceData>;
+  getBatchesByPurchaseItemIds(itemIds: string[]): Promise<ProductBatch[]>;
 }
 
 export const purchaseDataRepository: PurchaseInvoiceRepository =
@@ -107,7 +109,10 @@ function getService(): PurchaseInvoiceService {
 }
 
 export const purchaseRepository = {
+  // ============================================================
   // Observables for UI
+  // ============================================================
+
   observeAll: () =>
     invoiceCollection.query(Q.sortBy("created_at", Q.desc)).observe(),
 
@@ -126,7 +131,10 @@ export const purchaseRepository = {
       )
       .observe(),
 
+  // ============================================================
   // UI action: create draft
+  // ============================================================
+
   createDraft: async (input: {
     supplierId?: string;
     invoiceDate: Date | string;
@@ -141,7 +149,7 @@ export const purchaseRepository = {
     notes?: string;
   }) => {
     if (!input.supplierId) {
-      throw new Error("Ø§Ù„Ù…ÙˆØ±Ø¯ Ù…Ø·Ù„ÙˆØ¨ Ù„Ø¥Ù†Ø´Ø§Ø¡ ÙØ§ØªÙˆØ±Ø© Ø´Ø±Ø§Ø¡.");
+      throw new Error("المورد مطلوب لإنشاء فاتورة شراء.");
     }
     const service = getService();
     return service.createDraft({
@@ -153,7 +161,10 @@ export const purchaseRepository = {
     });
   },
 
-  // UI action: update draft (supports { id, ... } or (id, input))
+  // ============================================================
+  // UI action: update draft
+  // ============================================================
+
   updateDraft: async (
     arg1:
       | string
@@ -190,7 +201,7 @@ export const purchaseRepository = {
       }>;
     };
     if (!data.supplierId) {
-      throw new Error("Ø§Ù„Ù…ÙˆØ±Ø¯ Ù…Ø·Ù„ÙˆØ¨ Ù„ØªØ¹Ø¯ÙŠÙ„ ÙØ§ØªÙˆØ±Ø© Ø´Ø±Ø§Ø¡.");
+      throw new Error("المورد مطلوب لتعديل فاتورة شراء.");
     }
     return service.updateDraft(data.id, {
       supplierId: data.supplierId,
@@ -201,18 +212,27 @@ export const purchaseRepository = {
     });
   },
 
+  // ============================================================
   // UI action: post draft
+  // ============================================================
+
   approve: async (id: string, paymentAmount?: number) => {
     return getService().post(id, paymentAmount);
   },
 
+  // ============================================================
   // UI action: cancel posted invoice (with full reversal)
+  // ============================================================
+
   cancel: async (id: string) => {
     const today = new Date().toISOString().slice(0, 10);
     return getService().cancel(id, today);
   },
 
+  // ============================================================
   // UI action: create and approve in one flow
+  // ============================================================
+
   create: async (data: {
     supplierId: string;
     invoiceDate: Date | string;
@@ -231,12 +251,16 @@ export const purchaseRepository = {
     return getService().post(draft.id, data.paidAmount);
   },
 
-  // Direct repo queries
+  // ============================================================
+  // Direct repository queries
+  // ============================================================
+
   getById: (id: string) => purchaseDataRepository.getById(id),
   getByNumber: (num: string) => purchaseDataRepository.getByNumber(num),
   getBySupplier: (sid: string) => purchaseDataRepository.getBySupplier(sid),
   getDrafts: () => purchaseDataRepository.getDrafts(),
   getPosted: () => purchaseDataRepository.getPosted(),
+
+  getBatchesByPurchaseItemIds: (itemIds: string[]) =>
+    purchaseDataRepository.getBatchesByPurchaseItemIds(itemIds),
 };
-
-

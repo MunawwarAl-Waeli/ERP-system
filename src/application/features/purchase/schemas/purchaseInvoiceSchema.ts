@@ -1,5 +1,4 @@
-﻿// schemas/purchaseInvoiceSchema.ts
-import { z } from "zod";
+﻿import { z } from "zod";
 
 export const purchaseInvoiceItemSchema = z.object({
   productId: z.string().min(1, { message: "المنتج مطلوب" }),
@@ -7,6 +6,11 @@ export const purchaseInvoiceItemSchema = z.object({
   quantity: z.number().positive({ message: "الكمية يجب أن تكون أكبر من 0" }),
   unitCost: z.number().min(0, { message: "سعر الوحدة لا يمكن أن يكون سالباً" }),
   total: z.number().min(0),
+
+  // ⚠️ الحقول التالية للعرض فقط — لا تُرسل للـ Service
+  _productName: z.string().optional(),
+  _unitName: z.string().optional(),
+  _conversionFactor: z.number().optional(),
 });
 
 export const purchaseInvoiceSchema = z.object({

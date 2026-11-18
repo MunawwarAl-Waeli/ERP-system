@@ -37,12 +37,10 @@ import {
 
 export interface PurchaseInvoiceService {
   createDraft(input: CreatePurchaseInvoiceInput): Promise<PurchaseInvoiceData>;
-
   updateDraft(
     id: string,
     input: CreatePurchaseInvoiceInput,
   ): Promise<PurchaseInvoiceData>;
-
   post(invoiceId: string, paymentAmount?: number): Promise<PurchaseInvoiceData>;
   cancel(invoiceId: string, cancelledAt: string): Promise<PurchaseInvoiceData>;
   deleteDraft(invoiceId: string): Promise<void>;
@@ -75,21 +73,15 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
     this.validateCreateInput(input);
 
     return this.deps.unitOfWork.execute(async () => {
-      /*
-       * Idempotency check must happen inside the same
-       * transaction boundary as draft creation.
-       */
       if (input.idempotencyKey) {
         const existing =
           await this.deps.purchaseInvoiceRepository.getByIdempotencyKey(
             input.idempotencyKey,
           );
-
         if (existing) {
           return existing;
         }
       }
-
       return this.deps.purchaseInvoiceRepository.createDraft(input);
     });
   }
@@ -106,7 +98,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
       if (!existing) {
         throw new PurchaseInvoiceServiceError("Purchase invoice not found.");
       }
-
       if (existing.isCancelled) {
         throw new PurchaseInvoiceServiceError(
           "Cancelled purchase invoices cannot be updated.",
@@ -129,10 +120,41 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
     return this.deps.unitOfWork.execute(async () => {
       /*
        * ---------------------------------------------------------
+       * 0. Idempotency guard — prevent double-posting
+       * ---------------------------------------------------------
+       *
+       * If a posted journal already exists for this invoice,
+       * we MUST NOT touch inventory or accounting again.
+       * This covers:
+       *   - user double-tap on "post"
+       *   - partial failure & retry
+       *   - concurrent post attempts
+       */
+      const existingPurchaseJournal =
+        await this.deps.journalEntryRepository.getPostedByReference(
+          REFERENCE_TYPES.PURCHASE_INVOICE,
+          invoiceId,
+        );
+
+      if (existingPurchaseJournal) {
+        const current = await this.deps.purchaseInvoiceRepository.getById(
+          invoiceId,
+        );
+        if (current?.status === "posted") {
+          // Safe no-op — already posted
+          return current;
+        }
+        throw new PurchaseInvoiceServiceError(
+          "Purchase invoice has a posted journal but status is not 'posted'. " +
+            "Data may be inconsistent; please contact support.",
+        );
+      }
+
+      /*
+       * ---------------------------------------------------------
        * 1. Load invoice
        * ---------------------------------------------------------
        */
-
       const invoice = await this.deps.purchaseInvoiceRepository.getById(
         invoiceId,
       );
@@ -140,7 +162,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
       if (!invoice) {
         throw new PurchaseInvoiceServiceError("Purchase invoice not found.");
       }
-
       if (invoice.isCancelled) {
         throw new PurchaseInvoiceServiceError(
           "Cancelled purchase invoices cannot be posted.",
@@ -151,9 +172,7 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
           "Only draft purchase invoices can be posted.",
         );
       }
-      // ✅ نسمح بالترحيل بدون مورد إذا كانت الفاتورة نقدية (Cash)
-      // الشراء النقدي لا يتطلب بالضرورة وجود حساب مورد
-      if (invoice.paymentType !== "cash" && !invoice.supplierId) {
+      if (invoice.paymentType !== PAYMENT_TYPES.CASH && !invoice.supplierId) {
         throw new PurchaseInvoiceServiceError(
           "Supplier is required for credit or partial purchase invoices.",
         );
@@ -164,7 +183,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
        * 2. Resolve payment
        * ---------------------------------------------------------
        */
-
       const resolvedPaymentAmount = this.resolvePaymentAmount(
         invoice.paymentType,
         invoice.total,
@@ -176,7 +194,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
        * 3. Accounting settings
        * ---------------------------------------------------------
        */
-
       const settings = await this.deps.accountingSettingRepository.get();
 
       if (!settings) {
@@ -184,13 +201,11 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
           "Accounting settings are not configured.",
         );
       }
-
       if (!settings.suppliersAccountId) {
         throw new PurchaseInvoiceServiceError(
           "Suppliers account is not configured.",
         );
       }
-
       if (resolvedPaymentAmount > 0 && !settings.cashDefaultAccountId) {
         throw new PurchaseInvoiceServiceError(
           "Default cash account is not configured.",
@@ -202,7 +217,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
        * 4. Generate / resolve invoice number
        * ---------------------------------------------------------
        */
-
       const invoiceNumber =
         invoice.invoiceNumber ??
         (await this.deps.documentNumberGenerator.generate(
@@ -215,11 +229,8 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
        * 5. Prepare inventory + accounting data
        * ---------------------------------------------------------
        */
-
       const batchInputs: Array<CreateProductBatchInput> = [];
-
       const stockMovements: Array<StockMovementInput> = [];
-
       const journalLines: Array<{
         accountId: string;
         debit: number;
@@ -227,12 +238,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
       }> = [];
 
       for (const item of invoice.items) {
-        /*
-         * -------------------------------------------------------
-         * Product
-         * -------------------------------------------------------
-         */
-
         const product = await this.deps.productRepository.getById(
           item.productId,
         );
@@ -242,18 +247,11 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
             `Product not found: ${item.productId}`,
           );
         }
-
         if (!product.isActive) {
           throw new PurchaseInvoiceServiceError(
             `Product is inactive: ${product.name}`,
           );
         }
-
-        /*
-         * -------------------------------------------------------
-         * Product unit
-         * -------------------------------------------------------
-         */
 
         const productUnit = await this.deps.productRepository.getUnitById(
           item.productId,
@@ -266,22 +264,10 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
           );
         }
 
-        /*
-         * -------------------------------------------------------
-         * Convert quantity to base unit
-         * -------------------------------------------------------
-         */
-
         const baseQuantity = convertToBaseUnit({
           quantity: item.quantity,
           conversionFactor: productUnit.conversionFactor,
         });
-
-        /*
-         * Base unit = piece.
-         *
-         * A stock quantity cannot contain a fraction of a piece.
-         */
 
         if (!Number.isInteger(baseQuantity)) {
           throw new PurchaseInvoiceServiceError(
@@ -289,22 +275,10 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
           );
         }
 
-        /*
-         * -------------------------------------------------------
-         * Convert cost to base-unit cost
-         * -------------------------------------------------------
-         */
-
         const baseUnitCost = convertUnitCostToBaseUnit({
           unitCost: item.unitCost,
           conversionFactor: productUnit.conversionFactor,
         });
-
-        /*
-         * -------------------------------------------------------
-         * Batch
-         * -------------------------------------------------------
-         */
 
         batchInputs.push({
           productId: item.productId,
@@ -314,12 +288,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
           unitCost: baseUnitCost,
           receivedDate: invoice.invoiceDate,
         });
-
-        /*
-         * -------------------------------------------------------
-         * Stock movement
-         * -------------------------------------------------------
-         */
 
         stockMovements.push({
           productId: item.productId,
@@ -331,12 +299,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
           unitCost: baseUnitCost,
           movementDate: invoice.invoiceDate,
         });
-
-        /*
-         * -------------------------------------------------------
-         * Inventory accounting
-         * -------------------------------------------------------
-         */
 
         journalLines.push({
           accountId: product.inventoryAccountId,
@@ -350,7 +312,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
        * 6. Supplier payable
        * ---------------------------------------------------------
        */
-
       journalLines.push({
         accountId: settings.suppliersAccountId,
         debit: 0,
@@ -362,36 +323,23 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
        * 7. Validate purchase journal
        * ---------------------------------------------------------
        */
-
       validateJournalEntry(journalLines);
 
       /*
        * ---------------------------------------------------------
-       * 8. Create product batches
+       * 8-9. Create product batches + stock movements
        * ---------------------------------------------------------
        */
-
       for (const batchInput of batchInputs) {
         await this.deps.inventoryRepository.createBatch(batchInput);
       }
-
-      /*
-       * ---------------------------------------------------------
-       * 9. Create stock movements
-       * ---------------------------------------------------------
-       */
-
       await this.deps.inventoryRepository.createMovements(stockMovements);
 
       /*
        * ---------------------------------------------------------
        * 10. Purchase journal
-       *
-       * Inventory Dr
-       * Supplier  Cr
        * ---------------------------------------------------------
        */
-
       const purchaseJournal =
         await this.deps.journalEntryRepository.createDraft({
           entryDate: invoice.invoiceDate,
@@ -399,9 +347,7 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
           referenceId: invoice.id,
           description: `Purchase invoice ${invoiceNumber}`,
           createdBy: invoice.createdBy,
-          idempotencyKey: invoice.idempotencyKey
-            ? `${invoice.idempotencyKey}:purchase-journal`
-            : undefined,
+          idempotencyKey: this.buildPurchaseJournalKey(invoice),
           lines: journalLines,
         });
 
@@ -412,7 +358,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
        * 11. Automatic payment
        * ---------------------------------------------------------
        */
-
       if (resolvedPaymentAmount > 0) {
         await this.createAutoPayment({
           invoice,
@@ -426,12 +371,8 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
       /*
        * ---------------------------------------------------------
        * 12. Mark invoice as posted
-       *
-       * IMPORTANT:
-       * Persist the generated invoice number.
        * ---------------------------------------------------------
        */
-
       return this.deps.purchaseInvoiceRepository.markPosted(
         invoice.id,
         invoiceNumber,
@@ -439,17 +380,9 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
     });
   }
 
-  // async resetDraftPaidAmount(id: string): Promise<void> {
-  //   return this.deps.unitOfWork.execute(async () => {
-  //     const invoice = await this.deps.purchaseInvoiceRepository.getById(id);
-  //     if (invoice && invoice.paidAmount > 0) {
-  //       await this.deps.purchaseInvoiceRepository.decreasePaidAmount(
-  //         id,
-  //         invoice.paidAmount,
-  //       );
-  //     }
-  //   });
-  // }
+  // ============================================================
+  // Auto-payment
+  // ============================================================
 
   private async createAutoPayment(input: {
     invoice: PurchaseInvoiceData;
@@ -466,12 +399,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
       cashAccountId,
     } = input;
 
-    /*
-     * ---------------------------------------------------------
-     * 1. Generate payment voucher number
-     * ---------------------------------------------------------
-     */
-
     const voucherNumber = await this.deps.documentNumberGenerator.generate(
       DOCUMENT_PREFIXES.PAYMENT_VOUCHER,
       invoice.invoiceDate,
@@ -479,10 +406,12 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
 
     /*
      * ---------------------------------------------------------
-     * 2. Create payment voucher
+     * 1. Create payment voucher
+     *
+     * FIX (N12): use the unified key builder so that cancel()
+     * can reliably find this voucher later.
      * ---------------------------------------------------------
      */
-
     const paymentVoucher = await this.deps.paymentVoucherRepository.createDraft(
       {
         voucherNumber,
@@ -492,22 +421,15 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
         amount: paymentAmount,
         description: `Auto-payment for purchase invoice ${invoiceNumber}`,
         createdBy: invoice.createdBy,
-        idempotencyKey: invoice.idempotencyKey
-          ? `${invoice.idempotencyKey}:auto-payment`
-          : `purchase:${invoice.id}:auto-payment`,
+        idempotencyKey: this.buildAutoPaymentKey(invoice),
       },
     );
 
     /*
      * ---------------------------------------------------------
-     * 3. Allocate payment
-     *
-     * Repository enforces:
-     *
-     * allocation <= outstanding invoice balance
+     * 2. Allocate payment
      * ---------------------------------------------------------
      */
-
     await this.deps.paymentVoucherRepository.persistPosted({
       id: paymentVoucher.id,
       allocations: [
@@ -520,15 +442,9 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
 
     /*
      * ---------------------------------------------------------
-     * 4. Update paid_amount cache
-     *
-     * This is NOT the source of truth.
-     * Payment allocations remain the source of truth.
+     * 3. Update paid_amount cache
      * ---------------------------------------------------------
      */
-
-    // ✅ عند الترحيل: تعيين القيمة النهائية (وليس إضافة)
-    // لتجنب العد المزدوج مع paidAmount المحفوظ في المسودة
     await this.deps.purchaseInvoiceRepository.setPaidAmount(
       invoice.id,
       paymentAmount,
@@ -536,13 +452,9 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
 
     /*
      * ---------------------------------------------------------
-     * 5. Payment journal
-     *
-     * Supplier Dr
-     * Cash     Cr
+     * 4. Payment journal: Supplier Dr / Cash Cr
      * ---------------------------------------------------------
      */
-
     const paymentJournalLines = [
       {
         accountId: supplierAccountId,
@@ -564,14 +476,232 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
       referenceId: paymentVoucher.id,
       description: `Payment for purchase invoice ${invoiceNumber}`,
       createdBy: invoice.createdBy,
-      idempotencyKey: invoice.idempotencyKey
-        ? `${invoice.idempotencyKey}:auto-payment-journal`
-        : `purchase:${invoice.id}:auto-payment-journal`,
+      idempotencyKey: this.buildAutoPaymentJournalKey(invoice),
       lines: paymentJournalLines,
     });
 
     await this.deps.journalEntryRepository.post(paymentJournal.id);
   }
+
+  // ============================================================
+  // Cancel
+  // ============================================================
+
+  async cancel(
+    invoiceId: string,
+    cancelledAt: string,
+  ): Promise<PurchaseInvoiceData> {
+    const normalizedDate = this.normalizeDate(cancelledAt);
+
+    return this.deps.unitOfWork.execute(async () => {
+      const invoice = await this.deps.purchaseInvoiceRepository.getById(
+        invoiceId,
+      );
+      if (!invoice) {
+        throw new PurchaseInvoiceServiceError("Purchase invoice not found.");
+      }
+      if (invoice.isCancelled) {
+        return invoice;
+      }
+      if (invoice.status !== "posted") {
+        throw new PurchaseInvoiceServiceError(
+          "Only posted purchase invoices can be cancelled.",
+        );
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 1. Load batches via indexed query
+       *
+       * FIX (A1): replaces `query().fetch().filter()` which
+       * pulled the entire table into memory.
+       * ---------------------------------------------------------
+       */
+      const itemIds = invoice.items.map((i) => i.id);
+      const batches =
+        await this.deps.purchaseInvoiceRepository.getBatchesByPurchaseItemIds(
+          itemIds,
+        );
+
+      /*
+       * ---------------------------------------------------------
+       * 2. Ensure no batch has been consumed
+       *
+       * FIX: use tolerance comparison for float safety.
+       * ---------------------------------------------------------
+       */
+      for (const batch of batches) {
+        if (
+          Math.abs(batch.quantityRemaining - batch.quantityReceived) > 0.0001
+        ) {
+          throw new PurchaseInvoiceServiceError(
+            "لا يمكن إلغاء فاتورة الشراء لأن بعض كمياتها تم بيعها بالفعل.",
+          );
+        }
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 3. Zero out remaining quantities
+       * ---------------------------------------------------------
+       */
+      if (batches.length > 0) {
+        await database.batch(
+          ...batches.map((b) =>
+            b.prepareUpdate((record: { quantityRemaining: number }) => {
+              record.quantityRemaining = 0;
+            }),
+          ),
+        );
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 4. Create reversal stock movements
+       *
+       * FIX (C6): link each batch back to its SPECIFIC item
+       * via purchaseItemId (not via productId lookup which
+       * breaks when the same product appears twice).
+       * ---------------------------------------------------------
+       */
+      const itemByPurchaseItemId = new Map(invoice.items.map((i) => [i.id, i]));
+
+      const movements = batches.map((b) => {
+        const purchaseItemId = b.purchaseItemId;
+        if (!purchaseItemId) {
+          throw new PurchaseInvoiceServiceError(
+            `Batch ${b.id} is missing purchase_item_id.`,
+          );
+        }
+        const item = itemByPurchaseItemId.get(purchaseItemId);
+        if (!item) {
+          throw new PurchaseInvoiceServiceError(
+            `Batch ${b.id} references unknown purchase item ${purchaseItemId}.`,
+          );
+        }
+        return {
+          productId: b.product.id,
+          productUnitId: item.productUnitId,
+          quantity: b.quantityReceived,
+          // TODO(Sprint 3): introduce PURCHASE_RETURN movement type
+          // and stop overloading ADJUSTMENT_OUT.
+          movementType: STOCK_MOVEMENT_TYPES.ADJUSTMENT_OUT,
+          referenceType: REFERENCE_TYPES.PURCHASE_INVOICE,
+          referenceId: invoice.id,
+          unitCost: b.unitCost,
+          movementDate: normalizedDate,
+        };
+      });
+
+      if (movements.length > 0) {
+        await this.deps.inventoryRepository.createMovements(movements as any);
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 5. Find and cancel auto-created payment vouchers
+       *
+       * FIX (N12): query BOTH the new unified key and the
+       * legacy "purchase:..." key, to remain backward-compatible
+       * with vouchers created before this fix.
+       * ---------------------------------------------------------
+       */
+      const autoPaymentKeys = [
+        this.buildAutoPaymentKey(invoice),
+        `purchase:${invoice.id}:auto-payment`, // legacy fallback
+      ];
+
+      const paymentCollection =
+        database.get<PaymentVoucher>("payment_vouchers");
+      const autoPvs = await paymentCollection
+        .query(Q.where("idempotency_key", Q.oneOf(autoPaymentKeys)))
+        .fetch();
+
+      for (const autoPv of autoPvs) {
+        if (autoPv.isCancelled) continue;
+
+        await this.deps.paymentVoucherRepository.markCancelled(
+          autoPv.id,
+          normalizedDate,
+        );
+
+        const autoPvJournal =
+          await this.deps.journalEntryRepository.getPostedByReference(
+            REFERENCE_TYPES.PAYMENT_VOUCHER,
+            autoPv.id,
+          );
+        if (autoPvJournal) {
+          await this.deps.journalEntryRepository.reverse(
+            autoPvJournal.id,
+            normalizedDate,
+            `عكس سداد فاتورة شراء ${invoice.invoiceNumber ?? invoice.id}`,
+          );
+        }
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 6. Reset paid_amount cache
+       *
+       * FIX (N13): the invoice is being fully cancelled, so
+       * its paid_amount must return to 0 to stay consistent
+       * with the reversed GL. Otherwise reports that read
+       * paid_amount directly will show stale payments.
+       * ---------------------------------------------------------
+       */
+      if (invoice.paidAmount > 0) {
+        await this.deps.purchaseInvoiceRepository.setPaidAmount(invoice.id, 0);
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 7. Reverse purchase journal
+       * ---------------------------------------------------------
+       */
+      const purchaseJournal =
+        await this.deps.journalEntryRepository.getPostedByReference(
+          REFERENCE_TYPES.PURCHASE_INVOICE,
+          invoice.id,
+        );
+      if (purchaseJournal) {
+        await this.deps.journalEntryRepository.reverse(
+          purchaseJournal.id,
+          normalizedDate,
+          `عكس فاتورة شراء ${invoice.invoiceNumber ?? invoice.id}`,
+        );
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 8. Mark invoice as cancelled
+       * ---------------------------------------------------------
+       */
+      return this.deps.purchaseInvoiceRepository.markCancelled(
+        invoice.id,
+        normalizedDate,
+      );
+    });
+  }
+
+  // ============================================================
+  // Helpers — idempotency key builders (single source of truth)
+  // ============================================================
+
+  private buildAutoPaymentKey(invoice: PurchaseInvoiceData): string {
+    return `${invoice.idempotencyKey ?? invoice.id}:auto-payment`;
+  }
+
+  private buildAutoPaymentJournalKey(invoice: PurchaseInvoiceData): string {
+    return `${invoice.idempotencyKey ?? invoice.id}:auto-payment-journal`;
+  }
+
+  private buildPurchaseJournalKey(invoice: PurchaseInvoiceData): string {
+    return `${invoice.idempotencyKey ?? invoice.id}:purchase-journal`;
+  }
+
+  // ============================================================
+  // Payment resolution
+  // ============================================================
 
   private resolvePaymentAmount(
     paymentType: PaymentType,
@@ -600,7 +730,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
             "Cash purchase payment must equal the invoice total.",
           );
         }
-
         return total;
 
       case PAYMENT_TYPES.CREDIT:
@@ -609,7 +738,6 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
             "Credit purchase cannot have an immediate payment.",
           );
         }
-
         return 0;
 
       case PAYMENT_TYPES.PARTIAL:
@@ -618,13 +746,11 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
             "Partial purchase requires a payment amount.",
           );
         }
-
         if (requestedAmount >= total) {
           throw new PurchaseInvoiceServiceError(
             "Partial payment must be less than the invoice total.",
           );
         }
-
         return requestedAmount;
 
       default:
@@ -634,17 +760,17 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
     }
   }
 
-  private validateCreateInput(input: CreatePurchaseInvoiceInput): void {
-  
+  // ============================================================
+  // Validation
+  // ============================================================
 
+  private validateCreateInput(input: CreatePurchaseInvoiceInput): void {
     if (!input.invoiceDate) {
       throw new PurchaseInvoiceServiceError("Invoice date is required.");
     }
-
     if (!input.createdBy) {
       throw new PurchaseInvoiceServiceError("Created by is required.");
     }
-
     if (!input.items.length) {
       throw new PurchaseInvoiceServiceError(
         "Purchase invoice must contain at least one item.",
@@ -657,25 +783,21 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
           "Product is required for every item.",
         );
       }
-
       if (!item.productUnitId) {
         throw new PurchaseInvoiceServiceError(
           "Product unit is required for every item.",
         );
       }
-
       if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
         throw new PurchaseInvoiceServiceError(
           "Item quantity must be greater than zero.",
         );
       }
-
       if (!Number.isFinite(item.unitCost) || item.unitCost <= 0) {
         throw new PurchaseInvoiceServiceError(
           "Item unit cost must be greater than zero.",
         );
       }
-
       if (!Number.isFinite(item.total) || item.total <= 0) {
         throw new PurchaseInvoiceServiceError(
           "Item total must be greater than zero.",
@@ -683,24 +805,8 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
       }
     }
   }
-  async deleteDraft(invoiceId: string): Promise<void> {
-    return this.deps.unitOfWork.execute(async () => {
-      const invoice = await this.deps.purchaseInvoiceRepository.getById(invoiceId);
-      if (!invoice) {
-        throw new PurchaseInvoiceServiceError("Purchase invoice not found.");
-      }
-      if (invoice.status !== "draft") {
-        throw new PurchaseInvoiceServiceError("Only draft invoices can be deleted.");
-      }
-      await this.deps.purchaseInvoiceRepository.deleteDraft(invoiceId);
-    });
-  }
 
-  async cancel(
-    invoiceId: string,
-    cancelledAt: string,
-  ): Promise<PurchaseInvoiceData> {
-    const normalizedDate = this.normalizeDate(cancelledAt);
+  async deleteDraft(invoiceId: string): Promise<void> {
     return this.deps.unitOfWork.execute(async () => {
       const invoice = await this.deps.purchaseInvoiceRepository.getById(
         invoiceId,
@@ -708,106 +814,12 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
       if (!invoice) {
         throw new PurchaseInvoiceServiceError("Purchase invoice not found.");
       }
-      if (invoice.isCancelled) {
-        return invoice;
-      }
-      if (invoice.status !== "posted") {
+      if (invoice.status !== "draft") {
         throw new PurchaseInvoiceServiceError(
-          "Only posted purchase invoices can be cancelled.",
+          "Only draft invoices can be deleted.",
         );
       }
-      const batchCollection = database.get<ProductBatch>("product_batches");
-      const itemIds = invoice.items.map((i) => i.id);
-      const batches = (await batchCollection.query().fetch()).filter(
-        (b: { purchaseItemId: string }) =>
-          b.purchaseItemId && itemIds.includes(b.purchaseItemId),
-      );
-      for (const batch of batches) {
-        if (batch.quantityRemaining < batch.quantityReceived) {
-          throw new PurchaseInvoiceServiceError(
-            "Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¥Ù„ØºØ§Ø¡ ÙØ§ØªÙˆØ±Ø© Ø§Ù„Ø´Ø±Ø§Ø¡ Ù„Ø£Ù† Ø¨Ø¹Ø¶ ÙƒÙ…ÙŠØ§ØªÙ‡Ø§ ØªÙ… Ø¨ÙŠØ¹Ù‡Ø§ Ø¨Ø§Ù„ÙØ¹Ù„.",
-          );
-        }
-      }
-      if (batches.length > 0) {
-        await database.batch(
-          ...batches.map(
-            (b: { prepareUpdate: (arg0: (record: any) => void) => any }) =>
-              b.prepareUpdate((record: { quantityRemaining: number }) => {
-                record.quantityRemaining = 0;
-              }),
-          ),
-        );
-      }
-      const movements = batches.map(
-        (b: {
-          product: { id: string };
-          quantityReceived: any;
-          unitCost: any;
-        }) => ({
-          productId: b.product.id,
-          productUnitId:
-            invoice.items.find((i) => i.productId === b.product.id)
-              ?.productUnitId ?? "",
-          quantity: b.quantityReceived,
-          movementType: STOCK_MOVEMENT_TYPES.ADJUSTMENT_OUT,
-          referenceType: REFERENCE_TYPES.PURCHASE_INVOICE,
-          referenceId: invoice.id,
-          unitCost: b.unitCost,
-          movementDate: normalizedDate,
-        }),
-      );
-      if (movements.length > 0) {
-        await this.deps.inventoryRepository.createMovements(movements as any);
-      }
-      const paymentCollection =
-        database.get<PaymentVoucher>("payment_vouchers");
-      const autoPvs = await paymentCollection
-        .query(
-          Q.where(
-            "idempotency_key",
-            `${invoice.idempotencyKey ?? invoice.id}:auto-payment`,
-          ),
-        )
-        .fetch();
-      for (const autoPv of autoPvs) {
-        if (!autoPv.isCancelled) {
-          await this.deps.paymentVoucherRepository.markCancelled(
-            autoPv.id,
-            normalizedDate,
-          );
-          const autoPvJournal =
-            await this.deps.journalEntryRepository.getPostedByReference(
-              REFERENCE_TYPES.PAYMENT_VOUCHER,
-              autoPv.id,
-            );
-          if (autoPvJournal) {
-            await this.deps.journalEntryRepository.reverse(
-              autoPvJournal.id,
-              normalizedDate,
-              `Ø¹ÙƒØ³ Ø³Ø¯Ø§Ø¯ ÙØ§ØªÙˆØ±Ø© Ø´Ø±Ø§Ø¡ ${
-                invoice.invoiceNumber ?? invoice.id
-              }`,
-            );
-          }
-        }
-      }
-      const purchaseJournal =
-        await this.deps.journalEntryRepository.getPostedByReference(
-          REFERENCE_TYPES.PURCHASE_INVOICE,
-          invoice.id,
-        );
-      if (purchaseJournal) {
-        await this.deps.journalEntryRepository.reverse(
-          purchaseJournal.id,
-          normalizedDate,
-          `Ø¹ÙƒØ³ ÙØ§ØªÙˆØ±Ø© Ø´Ø±Ø§Ø¡ ${invoice.invoiceNumber ?? invoice.id}`,
-        );
-      }
-      return this.deps.purchaseInvoiceRepository.markCancelled(
-        invoice.id,
-        normalizedDate,
-      );
+      await this.deps.purchaseInvoiceRepository.deleteDraft(invoiceId);
     });
   }
 
@@ -821,6 +833,3 @@ export class PurchaseInvoiceServiceImpl implements PurchaseInvoiceService {
     return trimmed;
   }
 }
-
-
-

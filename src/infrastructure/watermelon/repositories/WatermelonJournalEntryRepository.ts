@@ -52,6 +52,7 @@ export class WatermelonJournalEntryRepository
         Q.where("reference_type", referenceType),
         Q.where("reference_id", referenceId),
         Q.where("reversal_of_id", null),
+        Q.where("status", Q.notEq(JOURNAL_ENTRY_STATUSES.REVERSED)),
         Q.take(1),
       )
       .fetch();
@@ -67,7 +68,11 @@ export class WatermelonJournalEntryRepository
     idempotencyKey: string,
   ): Promise<JournalEntryData | null> {
     const records = await this.entries
-      .query(Q.where("idempotency_key", idempotencyKey), Q.take(1))
+      .query(
+        Q.where("idempotency_key", idempotencyKey),
+        Q.where("status", Q.notEq(JOURNAL_ENTRY_STATUSES.REVERSED)),
+        Q.take(1),
+      )
       .fetch();
 
     if (records.length === 0) {
@@ -92,7 +97,9 @@ export class WatermelonJournalEntryRepository
       )
       .fetch();
 
-    return Promise.all(records.map((record: JournalEntry) => this.toData(record)));
+    return Promise.all(
+      records.map((record: JournalEntry) => this.toData(record)),
+    );
   }
 
   async getPostedByReference(
@@ -121,27 +128,40 @@ export class WatermelonJournalEntryRepository
   // =========================================================
 
   async createDraft(input: CreateJournalEntryInput): Promise<JournalEntryData> {
-    const entry = await this.entries.create((record: { entryDate: number; referenceType: string | null; referenceId: string | null; description: string | null; status: string; createdBy: string; idempotencyKey: string | null; isReversed: boolean; reversedAt: null; reversalOfId: null; }) => {
-      record.entryDate = this.toTimestamp(input.entryDate);
+    const entry = await this.entries.create(
+      (record: {
+        entryDate: number;
+        referenceType: string | null;
+        referenceId: string | null;
+        description: string | null;
+        status: string;
+        createdBy: string;
+        idempotencyKey: string | null;
+        isReversed: boolean;
+        reversedAt: null;
+        reversalOfId: null;
+      }) => {
+        record.entryDate = this.toTimestamp(input.entryDate);
 
-      record.referenceType = input.referenceType ?? null;
+        record.referenceType = input.referenceType ?? null;
 
-      record.referenceId = input.referenceId ?? null;
+        record.referenceId = input.referenceId ?? null;
 
-      record.description = input.description ?? null;
+        record.description = input.description ?? null;
 
-      record.status = JOURNAL_ENTRY_STATUSES.DRAFT;
+        record.status = JOURNAL_ENTRY_STATUSES.DRAFT;
 
-      record.createdBy = input.createdBy;
+        record.createdBy = input.createdBy;
 
-      record.idempotencyKey = input.idempotencyKey ?? null;
+        record.idempotencyKey = input.idempotencyKey ?? null;
 
-      record.isReversed = false;
+        record.isReversed = false;
 
-      record.reversedAt = null;
+        record.reversedAt = null;
 
-      record.reversalOfId = null;
-    });
+        record.reversalOfId = null;
+      },
+    );
 
     await this.createLines(entry, input.lines);
 
@@ -170,29 +190,37 @@ export class WatermelonJournalEntryRepository
 
     if (oldLines.length > 0) {
       await this.database.batch(
-        ...oldLines.map((line: { prepareDestroyPermanently: () => any; }) => line.prepareDestroyPermanently()),
+        ...oldLines.map((line: { prepareDestroyPermanently: () => any }) =>
+          line.prepareDestroyPermanently(),
+        ),
       );
     }
 
-    await entry.update((record: { entryDate: number; referenceType: string | null; referenceId: string | null; description: string | null; createdBy: string; idempotencyKey: string | null; isReversed: boolean; reversedAt: null; reversalOfId: null; }) => {
-      record.entryDate = this.toTimestamp(input.entryDate);
+    await entry.update(
+      (record: {
+        entryDate: number;
+        referenceType: string | null;
+        referenceId: string | null;
+        description: string | null;
+        createdBy: string;
+        idempotencyKey: string | null;
+      
+      }) => {
+        record.entryDate = this.toTimestamp(input.entryDate);
 
-      record.referenceType = input.referenceType ?? null;
+        record.referenceType = input.referenceType ?? null;
 
-      record.referenceId = input.referenceId ?? null;
+        record.referenceId = input.referenceId ?? null;
 
-      record.description = input.description ?? null;
+        record.description = input.description ?? null;
 
-      record.createdBy = input.createdBy;
+        record.createdBy = input.createdBy;
 
-      record.idempotencyKey = input.idempotencyKey ?? null;
+        record.idempotencyKey = input.idempotencyKey ?? null;
 
-      record.isReversed = false;
-
-      record.reversedAt = null;
-
-      record.reversalOfId = null;
-    });
+       
+      },
+    );
 
     await this.createLines(entry, input.lines);
 
@@ -228,7 +256,7 @@ export class WatermelonJournalEntryRepository
       );
     }
 
-    await entry.update((record: { status: string; }) => {
+    await entry.update((record: { status: string }) => {
       record.status = JOURNAL_ENTRY_STATUSES.POSTED;
     });
 
@@ -262,54 +290,78 @@ export class WatermelonJournalEntryRepository
       );
     }
 
-    const reversalEntry = await this.entries.create((record: { entryDate: number; referenceType: null; referenceId: null; description: string; status: string; createdBy: any; idempotencyKey: null; isReversed: boolean; reversedAt: null; reversalOfId: any; }) => {
-      record.entryDate = this.toTimestamp(reversalDate);
+    const reversalEntry = await this.entries.create(
+      (record: {
+        entryDate: number;
+        referenceType: null;
+        referenceId: null;
+        description: string;
+        status: string;
+        createdBy: any;
+        idempotencyKey: null;
+        isReversed: boolean;
+        reversedAt: null;
+        reversalOfId: any;
+      }) => {
+        record.entryDate = this.toTimestamp(reversalDate);
 
-      /*
-       * The reversal is linked to the original
-       * through reversalOfId.
-       *
-       * It must not masquerade as a new
-       * operational reference.
-       */
-      record.referenceType = null;
-      record.referenceId = null;
+        /*
+         * The reversal is linked to the original
+         * through reversalOfId.
+         *
+         * It must not masquerade as a new
+         * operational reference.
+         */
+        record.referenceType = null;
+        record.referenceId = null;
 
-      record.description =
-        description ?? `Reversal of journal entry ${original.id}`;
+        record.description =
+          description ?? `Reversal of journal entry ${original.id}`;
 
-      record.status = JOURNAL_ENTRY_STATUSES.POSTED;
+        record.status = JOURNAL_ENTRY_STATUSES.POSTED;
 
-      record.createdBy = original.createdBy;
+        record.createdBy = original.createdBy;
 
-      record.idempotencyKey = null;
+        record.idempotencyKey = null;
 
-      record.isReversed = false;
+        record.isReversed = false;
 
-      record.reversedAt = null;
+        record.reversedAt = null;
 
-      record.reversalOfId = original.id;
-    });
+        record.reversalOfId = original.id;
+      },
+    );
 
     await this.database.batch(
-      ...originalLines.map((line: { accountId: any; credit: any; debit: any; }, index: any) =>
-        this.lines.prepareCreate((record: { journalEntry: { set: (arg0: any) => void; }; accountId: any; debit: any; credit: any; lineOrder: any; }) => {
-          record.journalEntry.set(reversalEntry);
-          record.accountId = line.accountId;
-          record.debit = line.credit;
-          record.credit = line.debit;
-          record.lineOrder = index;
-        }),
+      ...originalLines.map(
+        (line: { accountId: any; credit: any; debit: any }, index: any) =>
+          this.lines.prepareCreate(
+            (record: {
+              journalEntry: { set: (arg0: any) => void };
+              accountId: any;
+              debit: any;
+              credit: any;
+              lineOrder: any;
+            }) => {
+              record.journalEntry.set(reversalEntry);
+              record.accountId = line.accountId;
+              record.debit = line.credit;
+              record.credit = line.debit;
+              record.lineOrder = index;
+            },
+          ),
       ),
     );
 
-    await original.update((record: { status: string; isReversed: boolean; reversedAt: number; }) => {
-      record.status = JOURNAL_ENTRY_STATUSES.REVERSED;
+    await original.update(
+      (record: { status: string; isReversed: boolean; reversedAt: number }) => {
+        record.status = JOURNAL_ENTRY_STATUSES.REVERSED;
 
-      record.isReversed = true;
+        record.isReversed = true;
 
-      record.reversedAt = this.toTimestamp(reversalDate);
-    });
+        record.reversedAt = this.toTimestamp(reversalDate);
+      },
+    );
 
     return this.toData(reversalEntry);
   }
@@ -328,13 +380,21 @@ export class WatermelonJournalEntryRepository
 
     await this.database.batch(
       ...inputLines.map((line, index) =>
-        this.lines.prepareCreate((record: { journalEntry: { set: (arg0: JournalEntry) => void; }; accountId: string; debit: number; credit: number; lineOrder: number; }) => {
-          record.journalEntry.set(entry);
-          record.accountId = line.accountId;
-          record.debit = line.debit;
-          record.credit = line.credit;
-          record.lineOrder = index;
-        }),
+        this.lines.prepareCreate(
+          (record: {
+            journalEntry: { set: (arg0: JournalEntry) => void };
+            accountId: string;
+            debit: number;
+            credit: number;
+            lineOrder: number;
+          }) => {
+            record.journalEntry.set(entry);
+            record.accountId = line.accountId;
+            record.debit = line.debit;
+            record.credit = line.credit;
+            record.lineOrder = index;
+          },
+        ),
       ),
     );
   }
@@ -428,6 +488,3 @@ export class WatermelonJournalEntryRepository
     return new Date(timestamp).toISOString().slice(0, 10);
   }
 }
-
-
-

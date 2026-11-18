@@ -55,9 +55,9 @@ export const MoreStack: React.FC = () => (
       name="JournalEntryDetails"
       component={JournalEntryDetailsScreen}
     />
-    {/* <Stack.Screen name="GeneralLedger" component={GeneralLedgerScreen} /> */}
+    <Stack.Screen name="GeneralLedger" component={GeneralLedgerScreen} />
     <Stack.Screen name="TrialBalance" component={TrialBalanceScreen} />
-    {/* <Stack.Screen name="AccountStatement" component={AccountStatementScreen} /> */}
+    <Stack.Screen name="AccountStatement" component={AccountStatementScreen} />
     <Stack.Screen name="ReceiptList" component={ReceiptListScreen} />
     <Stack.Screen name="CreateReceipt" component={CreateReceiptScreen} />
     <Stack.Screen name="ReceiptDetails" component={ReceiptDetailsScreen} />

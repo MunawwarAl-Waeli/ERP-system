@@ -76,7 +76,7 @@ export const PurchaseInvoicesList: React.FC<{
         buttons={[
           { value: "all", label: t("all") },
           { value: "draft", label: t("draft") },
-          { value: "approved", label: t("approved") },
+          { value: "posted", label: t("posted") },
           { value: "cancelled", label: t("cancelled") },
         ]}
         style={styles.filterButtons}

@@ -34,10 +34,83 @@ import {
   purchaseInvoiceSchema,
   PurchaseInvoiceFormData,
 } from "../schemas/purchaseInvoiceSchema";
+import ProductUnit from "src/database/models/ProductUnit";
+import { Q } from "@nozbe/watermelondb";
+import { database, Product, Unit } from "src/database";
+import { BarcodeScannerModal } from "../components/BarcodeScannerModal";
 
 interface NavigationProp {
   navigate: (screen: string, params?: Record<string, unknown>) => void;
   goBack: () => void;
+}
+
+// ============================================================
+// Helpers — safe text extraction from WatermelonDB Models
+// ============================================================
+
+/**
+ * Extract a displayable unit label from an unknown shape.
+ * The hook may return:
+ *   - a plain string (e.g. "كرتونة")
+ *   - a WatermelonDB Unit Model (has .name / .code)
+ *   - a Relation object { id, fetch }
+ *   - undefined / null
+ * We never pass a Model directly to <Text> / <Button>.
+ */
+// ============================================================
+// Helpers — safe text extraction from WatermelonDB Models
+// ============================================================
+
+function getUnitLabel(unitLike: any): string {
+  if (!unitLike) return "وحدة";
+
+  // 1. إذا كان نصاً (قد يكون الاسم أو الـ ID)
+  if (typeof unitLike === "string") {
+    // فحص إذا كان النص عبارة عن ID عشوائي من WatermelonDB (16 حرفاً)
+    if (/^[a-zA-Z0-9]{16}$/.test(unitLike)) {
+      return "وحدة"; // نتجاهل الـ ID ونضع كلمة افتراضية
+    }
+    return unitLike;
+  }
+
+  // 2. إذا كان كائناً (WatermelonDB Model أو Relation)
+  if (typeof unitLike === "object") {
+    // محاولة قراءة الاسم مباشرة
+    if (typeof unitLike.name === "string") return unitLike.name;
+    if (typeof unitLike.code === "string") return unitLike.code;
+
+    // محاولة قراءة الاسم من داخل بيانات WatermelonDB الخام
+    if (unitLike._raw) {
+      if (typeof unitLike._raw.name === "string") return unitLike._raw.name;
+      if (typeof unitLike._raw.code === "string") return unitLike._raw.code;
+    }
+
+    // محاولة قراءة الاسم إذا كان كائناً متداخلاً (Relation)
+    if (unitLike.unit && typeof unitLike.unit === "object") {
+      if (typeof unitLike.unit.name === "string") return unitLike.unit.name;
+      if (typeof unitLike.unit.code === "string") return unitLike.unit.code;
+      if (unitLike.unit._raw && typeof unitLike.unit._raw.name === "string") {
+        return unitLike.unit._raw.name;
+      }
+    }
+
+    // إذا كان هناك حقل مخصص للاسم مثل unitName
+    if (typeof unitLike.unitName === "string") return unitLike.unitName;
+  }
+
+  return "وحدة";
+}
+
+function getTextOrEmpty(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (typeof value === "object") {
+    const obj = value as Record<string, any>;
+    if (typeof obj.name === "string") return obj.name;
+    if (obj._raw && typeof obj._raw.name === "string") return obj._raw.name;
+  }
+  return "";
 }
 
 export const PurchaseInvoiceForm: React.FC<{
@@ -56,12 +129,16 @@ export const PurchaseInvoiceForm: React.FC<{
   const [unitCost, setUnitCost] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // حالات جديدة تمت إضافتها
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [paidAmount, setPaidAmount] = useState("");
   const [showConfirmApprove, setShowConfirmApprove] = useState(false);
   const [pendingApproveData, setPendingApproveData] =
     useState<PurchaseInvoiceFormData | null>(null);
+
+  // ... داخل المكون
+  const [showScanner, setShowScanner] = useState(false);
+
+  // أضف المكون في نهاية الـ JSX (قبل إغلاق SafeAreaView):
 
   // ========== Hooks ==========
   const { suppliers } = useSuppliers(supplierSearch);
@@ -71,7 +148,6 @@ export const PurchaseInvoiceForm: React.FC<{
   const {
     control,
     handleSubmit,
-    setValue,
     watch,
     formState: { errors },
   } = useForm<PurchaseInvoiceFormData>({
@@ -85,7 +161,7 @@ export const PurchaseInvoiceForm: React.FC<{
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control,
     name: "items",
   });
@@ -100,7 +176,6 @@ export const PurchaseInvoiceForm: React.FC<{
     0,
   );
 
-  // تحديث المبلغ المدفوع تلقائياً عند تغيير نوع الدفع
   React.useEffect(() => {
     if (paymentType === "cash") setPaidAmount(totalAmount.toString());
     else if (paymentType === "credit") setPaidAmount("0");
@@ -110,6 +185,44 @@ export const PurchaseInvoiceForm: React.FC<{
     )
       setPaidAmount("");
   }, [paymentType, totalAmount]);
+
+  const handleBarcodeScanned = async (barcodeStr: string) => {
+    if (!barcodeStr) return;
+
+    try {
+      const unitsCollection = database.get<ProductUnit>("product_units");
+      const result = await unitsCollection
+        .query(Q.where("barcode", barcodeStr))
+        .fetch();
+
+      if (result.length === 0) {
+        notify.error("الباركود غير مسجل لأي منتج!");
+        return;
+      }
+
+      const pu = result[0]; // ProductUnit Model
+
+      // 2. جلب اسم المنتج واسم الوحدة
+      const product = await database
+        .get<Product>("products")
+        .find(pu.productId);
+      const masterUnit = await database.get<Unit>("units").find(pu.unitId);
+
+      // 3. إضافة المنتج (الكمية الافتراضية 1، والسعر سعر الشراء)
+      addOrMergeItem(
+        product.id,
+        product.name,
+        pu.id,
+        masterUnit.name,
+        pu.conversionFactor,
+        1, // الكمية 1
+        pu.purchasePrice, // سعر التكلفة من بطاقة الوحدة
+      );
+    } catch (error) {
+      console.error(error);
+      notify.error("حدث خطأ أثناء قراءة الباركود");
+    }
+  };
 
   // ========== إضافة منتج ==========
   const handleAddProduct = () => {
@@ -126,14 +239,18 @@ export const PurchaseInvoiceForm: React.FC<{
       return;
     }
 
-    append({
-      productId: selectedProduct.product.id,
-      productUnitId: selectedUnit.id,
-      quantity: qty,
-      unitCost: cost,
-      total: qty * cost, // أضفنا الإجمالي هنا
-    });
+    // استدعاء الدالة الموحدة
+    addOrMergeItem(
+      selectedProduct.product.id,
+      selectedProduct.product.name,
+      selectedUnit.id,
+      selectedUnit.unitName,
+      selectedUnit.conversionFactor,
+      qty,
+      cost,
+    );
 
+    // إغلاق وتنظيف النافذة
     setShowProductModal(false);
     setProductSearch("");
     setSelectedProduct(null);
@@ -152,10 +269,10 @@ export const PurchaseInvoiceForm: React.FC<{
     setIsLoading(true);
     try {
       await services.purchaseInvoice.createDraft({
-        supplierId: data.supplierId || undefined, // undefined بدل ""
+        supplierId: data.supplierId || undefined,
         invoiceDate: data.invoiceDate.toISOString().slice(0, 10),
         paymentType: data.paymentType,
-        createdBy: data.createdBy, // ✅ جديد
+        createdBy: data.createdBy,
         paidAmount: parseFloat(paidAmount),
         items: data.items,
       });
@@ -174,7 +291,6 @@ export const PurchaseInvoiceForm: React.FC<{
       notify.warning(t("noItems"));
       return;
     }
-    // نفتح نافذة التأكيد بدلاً من Alert
     setPendingApproveData(data);
     setShowConfirmApprove(true);
   };
@@ -186,7 +302,6 @@ export const PurchaseInvoiceForm: React.FC<{
 
     setIsLoading(true);
     try {
-      // 1. حفظ كمسودة عبر الخدمة الرسمية
       const draft = await services.purchaseInvoice.createDraft({
         supplierId: data.supplierId || undefined,
         invoiceDate: data.invoiceDate.toISOString().slice(0, 10),
@@ -196,7 +311,6 @@ export const PurchaseInvoiceForm: React.FC<{
         items: data.items,
       });
 
-      // 2. الترحيل مع تمرير المبلغ المدفوع
       const numericPaid = parseFloat(paidAmount);
       await services.purchaseInvoice.post(draft.id, numericPaid);
 
@@ -211,7 +325,51 @@ export const PurchaseInvoiceForm: React.FC<{
       setPendingApproveData(null);
     }
   };
+  // دالة مساعدة لإضافة منتج أو تحديثه إذا كان موجوداً
+  const addOrMergeItem = (
+    productId: string,
+    productName: string,
+    productUnitId: string,
+    unitName: string,
+    conversionFactor: number,
+    qty: number,
+    cost: number,
+  ) => {
+    // 1. البحث عن المنتج بنفس الوحدة
+    const existingIndex = fields.findIndex(
+      (item) =>
+        item.productId === productId && item.productUnitId === productUnitId,
+    );
 
+    if (existingIndex > -1) {
+      // 2. إذا كان موجوداً، نقوم بتحديث الكمية والإجمالي
+      const existingItem = items[existingIndex];
+      const newQty = existingItem.quantity + qty;
+
+      update(existingIndex, {
+        ...existingItem,
+        quantity: newQty,
+        total: newQty * existingItem.unitCost, // نحافظ على نفس سعر التكلفة القديم
+        // أو يمكنك استخدام cost الجديد إذا أردت: total: newQty * cost
+      });
+
+      notify.success(`تم إضافة الكمية للمنتج ${productName} الموجود مسبقاً`);
+    } else {
+      // 3. إذا لم يكن موجوداً، نضيف سطراً جديداً
+      append({
+        productId,
+        productUnitId,
+        quantity: qty,
+        unitCost: cost,
+        total: qty * cost,
+        _productName: productName,
+        _unitName: unitName,
+        _conversionFactor: conversionFactor,
+      });
+
+      notify.success(t("addSuccess") || "تمت الإضافة بنجاح");
+    }
+  };
   // ========== عرض قائمة المنتجات في الـ Modal ==========
   const renderProductModal = () => (
     <Portal>
@@ -241,8 +399,8 @@ export const PurchaseInvoiceForm: React.FC<{
             return (
               <List.Item
                 key={product.product.id}
-                title={product.product.name}
-                description={product.product.sku}
+                title={getTextOrEmpty(product.product.name)}
+                description={getTextOrEmpty(product.product.sku)}
                 onPress={() => {
                   setSelectedProduct(product);
                   setSelectedUnit(product.units[0] || null);
@@ -267,7 +425,9 @@ export const PurchaseInvoiceForm: React.FC<{
 
         {selectedProduct && (
           <Surface style={styles.selectedProductCard} elevation={1}>
-            <Text variant="titleSmall">{selectedProduct.product.name}</Text>
+            <Text variant="titleSmall">
+              {getTextOrEmpty(selectedProduct.product.name)}
+            </Text>
             <View style={styles.unitButtons}>
               {selectedProduct.units.map((unit: any) => (
                 <Button
@@ -276,7 +436,7 @@ export const PurchaseInvoiceForm: React.FC<{
                   onPress={() => setSelectedUnit(unit)}
                   style={styles.unitButton}
                 >
-                  {unit.unitName || "وحدة"}
+                  {unit.unitName}
                 </Button>
               ))}
             </View>
@@ -323,7 +483,6 @@ export const PurchaseInvoiceForm: React.FC<{
         showBack
         onBack={() => navigation.goBack()}
       />
-
       <ScrollView style={styles.scrollView}>
         {/* ===== المورد ===== */}
         <View style={styles.section}>
@@ -349,8 +508,8 @@ export const PurchaseInvoiceForm: React.FC<{
                       {suppliers.map((supplier) => (
                         <List.Item
                           key={supplier.id}
-                          title={supplier.name}
-                          description={supplier.phone}
+                          title={getTextOrEmpty(supplier.name)}
+                          description={getTextOrEmpty(supplier.phone)}
                           onPress={() => {
                             onChange(supplier.id);
                             setSupplierSearch(supplier.name);
@@ -444,7 +603,6 @@ export const PurchaseInvoiceForm: React.FC<{
             )}
           />
 
-          {/* إضافة حقل المبلغ المدفوع هنا */}
           {(paymentType === "cash" || paymentType === "partial") && (
             <TextInput
               label="المبلغ المدفوع"
@@ -469,7 +627,7 @@ export const PurchaseInvoiceForm: React.FC<{
               <IconButton
                 icon={paperIcon("barcode")}
                 mode="contained"
-                onPress={() => notify.info("ميزة الباركود قادمة قريباً")}
+                onPress={() => setShowScanner(true)}
               />
               <IconButton
                 icon={paperIcon("plus")}
@@ -481,10 +639,16 @@ export const PurchaseInvoiceForm: React.FC<{
 
           {fields.map((field, index) => {
             const item = items[index];
-            // البحث عن اسم المنتج من المصفوفة المختارة سابقاً لتجنب undefined
-            const productName =
-              products.find((p) => p.product.id === item.productId)?.product
-                .name || `منتج ${index + 1}`;
+            const productName = item._productName ?? `منتج ${index + 1}`;
+            const unitName = item._unitName ?? "";
+            const lineTotal = (item?.quantity || 0) * (item?.unitCost || 0);
+
+            // حساب الكمية بالقطعة للعرض (تحويل داخلي للفهم)
+            const baseQty =
+              (item?.quantity || 0) * (item._conversionFactor ?? 1);
+            const showBaseQty =
+              item._conversionFactor !== undefined &&
+              item._conversionFactor !== 1;
 
             return (
               <View key={field.id} style={styles.itemRow}>
@@ -492,16 +656,29 @@ export const PurchaseInvoiceForm: React.FC<{
                   <Text variant="bodyMedium" style={{ fontWeight: "500" }}>
                     {productName}
                   </Text>
+
+                  {/* السطر الرئيسي: 5 كرتونة × 5,000 */}
                   <Text
                     variant="bodySmall"
                     style={{ color: theme.colors.onSurfaceVariant }}
                   >
-                    {item?.quantity || 0} × {item?.unitCost || 0}
+                    {item.quantity} {unitName ? `${unitName} ` : ""}×{" "}
+                    {item.unitCost.toLocaleString("ar-EG")}
                   </Text>
+
+                  {/* السطر الثانوي: التحويل للمخزون */}
+                  {showBaseQty && (
+                    <Text
+                      variant="labelSmall"
+                      style={{ color: theme.colors.primary, marginTop: 2 }}
+                    >
+                      ≈ {baseQty} قطعة في المخزون
+                    </Text>
+                  )}
                 </View>
-                <CurrencyText
-                  amount={(item?.quantity || 0) * (item?.unitCost || 0)}
-                />
+
+                <CurrencyText amount={lineTotal} />
+
                 <IconButton
                   icon={paperIcon("delete")}
                   size={20}
@@ -523,6 +700,19 @@ export const PurchaseInvoiceForm: React.FC<{
         <Surface style={styles.totalCard} elevation={2}>
           <Text variant="titleMedium">{t("total")}</Text>
           <CurrencyText amount={totalAmount} variant="headlineMedium" />
+
+          {/* ملخّص سريع */}
+          <Text
+            variant="bodySmall"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
+            {items.length} صنف •{" "}
+            {items.reduce(
+              (sum, i) => sum + i.quantity * (i._conversionFactor ?? 1),
+              0,
+            )}{" "}
+            قطعة إجمالاً
+          </Text>
         </Surface>
 
         {/* ===== أزرار الحفظ ===== */}
@@ -551,11 +741,7 @@ export const PurchaseInvoiceForm: React.FC<{
           </Button>
         </View>
       </ScrollView>
-
-      {/* Modal إضافة المنتج */}
       {renderProductModal()}
-
-      {/* نافذة التأكيد المخصصة */}
       <ConfirmDialog
         visible={showConfirmApprove}
         title={t("confirmApprove")}
@@ -565,6 +751,15 @@ export const PurchaseInvoiceForm: React.FC<{
         onConfirm={executeApproval}
         onDismiss={() => setShowConfirmApprove(false)}
       />
+      <BarcodeScannerModal
+        visible={showScanner}
+        onDismiss={() => setShowScanner(false)}
+        onCodeScanned={(code) => {
+          setShowScanner(false);
+          handleBarcodeScanned(code);
+        }}
+      />
+      ;
     </SafeAreaView>
   );
 };

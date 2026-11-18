@@ -31,6 +31,8 @@ export const CustomerCard: React.FC<CustomerCardProps> = React.memo(
     onPdf,
   }) => {
     const hasDebt = outstandingCredit > 0;
+    const hasAdvance = outstandingCredit < 0;
+    const isBalanced = outstandingCredit === 0;
 
     const formattedBalance = outstandingCredit.toLocaleString("en-US", {
       minimumFractionDigits: 0,
@@ -72,14 +74,18 @@ export const CustomerCard: React.FC<CustomerCardProps> = React.memo(
               style={[
                 styles.avatar,
                 {
-                  backgroundColor: hasDebt ? Colors.errorBg : Colors.surfaceVariant,
+                  backgroundColor: hasDebt
+                    ? Colors.errorBg
+                    : Colors.surfaceVariant,
                 },
               ]}
             >
               <Text
                 style={[
                   styles.avatarText,
-                  { color: hasDebt ? Colors.creditRed : Colors.onSurfaceVariant },
+                  {
+                    color: hasDebt ? Colors.creditRed : Colors.onSurfaceVariant,
+                  },
                 ]}
               >
                 {avatarLetter}
@@ -87,49 +93,88 @@ export const CustomerCard: React.FC<CustomerCardProps> = React.memo(
             </View>
 
             <View style={styles.infoCol}>
-              <Text style={[styles.customerName, { color: Colors.onSurface }]} numberOfLines={1}>
+              <Text
+                style={[styles.customerName, { color: Colors.onSurface }]}
+                numberOfLines={1}
+              >
                 {name}
               </Text>
               {phone ? (
                 <View style={styles.phoneRow}>
-                  <AppIcon name="phone" size={12} color={Colors.onSurfaceVariant} />
+                  <AppIcon
+                    name="phone"
+                    size={12}
+                    color={Colors.onSurfaceVariant}
+                  />
                   <Text
                     style={[
                       styles.phoneText,
-                      { color: Colors.onSurfaceVariant, writingDirection: "ltr" },
+                      {
+                        color: Colors.onSurfaceVariant,
+                        writingDirection: "ltr",
+                      },
                     ]}
                   >
                     {phone}
                   </Text>
                 </View>
               ) : (
-                <Text style={[styles.noPhoneText, { color: Colors.neutralText }]}>بدون رقم</Text>
+                <Text
+                  style={[styles.noPhoneText, { color: Colors.neutralText }]}
+                >
+                  بدون رقم
+                </Text>
               )}
             </View>
 
             {/* شارة الرصيد */}
+
             <View
               style={[
                 styles.badge,
                 {
-                  backgroundColor: hasDebt ? Colors.errorBg : Colors.surfaceVariant,
-                  borderColor: hasDebt ? Colors.errorLight : Colors.border,
+                  backgroundColor: hasDebt
+                    ? Colors.errorBg
+                    : hasAdvance
+                    ? Colors.successBg || "#E8F5E9"
+                    : Colors.surfaceVariant,
+                  borderColor: hasDebt
+                    ? Colors.errorLight
+                    : hasAdvance
+                    ? Colors.successLight || "#A5D6A7"
+                    : Colors.border,
                 },
               ]}
             >
               <Text
                 style={[
                   styles.badgeLabel,
-                  { color: hasDebt ? Colors.creditRed : Colors.neutralText },
+                  {
+                    color: hasDebt
+                      ? Colors.creditRed
+                      : hasAdvance
+                      ? Colors.paymentGreen || "#2E7D32"
+                      : Colors.neutralText,
+                  },
                 ]}
               >
-                {hasDebt ? "مستحق عليه" : "متوازن"}
+                {hasDebt
+                  ? "مستحق عليه"
+                  : hasAdvance
+                  ? "له رصيد مقدم"
+                  : "متوازن"}
               </Text>
-              {hasDebt && (
+
+              {!isBalanced && (
                 <Text
                   style={[
                     styles.badgeValue,
-                    { color: Colors.creditRed, writingDirection: "ltr" },
+                    {
+                      color: hasDebt
+                        ? Colors.creditRed
+                        : Colors.paymentGreen || "#2E7D32",
+                      writingDirection: "ltr",
+                    },
                   ]}
                 >
                   {formattedBalance} <Text style={styles.currency}>ر.ي</Text>
@@ -154,7 +199,11 @@ export const CustomerCard: React.FC<CustomerCardProps> = React.memo(
               </Pressable>
 
               <Pressable style={styles.miniActionBtn} onPress={onWhatsapp}>
-                <AppIcon name="whatsapp" size={15} color={Colors.onSurfaceVariant} />
+                <AppIcon
+                  name="whatsapp"
+                  size={15}
+                  color={Colors.onSurfaceVariant}
+                />
               </Pressable>
 
               <Pressable style={styles.miniActionBtn} onPress={onSms}>
@@ -162,14 +211,18 @@ export const CustomerCard: React.FC<CustomerCardProps> = React.memo(
               </Pressable>
 
               <Pressable style={styles.miniActionBtn} onPress={onPdf}>
-                <AppIcon name="file-pdf-box" size={15} color={Colors.onSurfaceVariant} />
+                <AppIcon
+                  name="file-pdf-box"
+                  size={15}
+                  color={Colors.onSurfaceVariant}
+                />
               </Pressable>
             </View>
           </View>
         </Pressable>
       </Surface>
     );
-  }
+  },
 );
 
 const styles = StyleSheet.create({

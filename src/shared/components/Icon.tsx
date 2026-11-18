@@ -101,8 +101,10 @@ import {
 const iconMap: Record<string, React.FC<LucideProps>> = {
   // Navigation & Core
   "view-dashboard": LayoutDashboard,
+  dashboard: LayoutDashboard,
   "account-group": Users,
   users: Users,
+  user: User,
   receipt: Receipt,
   "package-variant-closed": PackageOpen,
   "package-variant": Package,
@@ -110,14 +112,26 @@ const iconMap: Record<string, React.FC<LucideProps>> = {
   "dots-vertical": MoreVertical,
   "more-vertical": MoreVertical,
 
+  // Directional & Chevrons
+  "chevron-right": ChevronRight,
+  "chevron-left": ChevronLeft,
+  "chevron-down": ChevronDown,
+  "arrow-left": ArrowLeft,
+  "arrow-up": ArrowUp,
+  "arrow-down": ArrowDown,
+  "arrow-up-down": ArrowUpDown,
+  filter: ArrowUpDown,
+
   // Actions & Controls
   close: X,
   x: X,
   plus: Plus,
   minus: Minus,
+  "plus-circle": PlusCircle,
   "account-plus": UserPlus,
   delete: Trash2,
   "trash-2": Trash2,
+  trash: Trash2,
   pencil: Pencil,
   check: Check,
   "check-circle": CheckCircle2,
@@ -127,6 +141,12 @@ const iconMap: Record<string, React.FC<LucideProps>> = {
   "minus-square": MinusSquare,
   cog: Settings,
   settings: Settings,
+  printer: Printer, // 👈 تم إضافة أيقونة الطباعة
+  share: Share2,
+  "share-2": Share2,
+  upload: Upload,
+  download: Download,
+  refresh: RefreshCw,
 
   // Communication & Media
   phone: Phone,
@@ -135,11 +155,39 @@ const iconMap: Record<string, React.FC<LucideProps>> = {
   "file-pdf-box": FileText,
   "file-text": FileText,
 
-  // Filters & Status Icons
-  magnify: Search,
-  search: Search,
-  filter: ArrowUpDown,
+  // Finance, Sales & Analytics
+  "trending-up": TrendingUp,
+  "trending-down": TrendingDown,
+  "hand-coins": HandCoins,
+  "bar-chart": BarChart3,
+  banknote: Banknote,
+  "credit-card": CreditCard,
+  wallet: Wallet,
+  "wallet-cards": WalletCards,
+  landmark: Landmark,
+  calculator: Calculator,
+  tag: Tag,
+  barcode: Barcode,
+  "shopping-cart": ShoppingCart,
+
+  // Status & Info
   "alert-circle": AlertCircle,
+  "alert-triangle": AlertTriangle,
+  info: Info,
+  search: Search,
+  magnify: Search,
+  clock: Clock,
+  calendar: Calendar,
+  history: History,
+  lock: LockKeyhole,
+  eye: Eye,
+  "eye-off": EyeOff,
+  shield: Shield,
+  "shield-check": ShieldCheck,
+  "map-pin": MapPin,
+  "sticky-note": StickyNote,
+  truck: Truck,
+  database: Database,
 };
 
 export interface AppIconProps {

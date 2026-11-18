@@ -35,6 +35,41 @@ import {
 } from "src/application/features/reports/services/reportService";
 import ChartOfAccount from "src/database/models/ChartOfAccount";
 
+// 1. استيراد MoreScreenProps من ملف types الخاص بالـ Navigation لديك
+
+// 2. تحديث واجهة AccountReportScreen لتكون مرنة وقابلة لاستقبال أي Navigation
+interface AccountReportScreenProps {
+  navigation: any;
+  route?: { params?: { accountId?: string } };
+  title: string;
+  loadReport: (
+    accountId: string,
+    from?: Date,
+    to?: Date,
+  ) => Promise<LedgerReport>;
+}
+
+// 3. ✅ تصحيح تعريف شاشتي "الأستاذ العام" و "كشف الحساب" باستخدام MoreScreenProps
+export const GeneralLedgerScreen: React.FC<MoreScreenProps<"GeneralLedger">> = (
+  props,
+) => (
+  <AccountReportScreen
+    {...props}
+    title="الأستاذ العام"
+    loadReport={reportService.getGeneralLedger}
+  />
+);
+
+export const AccountStatementScreen: React.FC<
+  MoreScreenProps<"AccountStatement">
+> = (props) => (
+  <AccountReportScreen
+    {...props}
+    title="كشف الحساب"
+    loadReport={reportService.getAccountStatement}
+  />
+);
+
 interface NavigationProp {
   navigate: (screen: string, params?: Record<string, string>) => void;
   goBack: () => void;
@@ -61,12 +96,17 @@ const ScreenError: React.FC<{ message: string; onRetry: () => void }> = ({
 // ==========================================
 // 1. شاشة قائمة القيود اليومية
 // ==========================================
+import { useFocusEffect } from "@react-navigation/native";
+import { useDebounce } from "@shared/hooks/useDebounce"; // تأكد من استيراد هوك الـ debounce لديك
+import { MoreScreenProps } from "src/navigation/types";
+
 export const JournalEntriesScreen: React.FC<{ navigation: NavigationProp }> = ({
   navigation,
 }) => {
   const theme = useTheme();
   const [entries, setEntries] = useState<JournalEntrySummary[]>([]);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300); // 👈 إضافة debounce لحماية الأداء
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(undefined);
 
@@ -81,7 +121,11 @@ export const JournalEntriesScreen: React.FC<{ navigation: NavigationProp }> = ({
     setError(null);
     try {
       setEntries(
-        await reportService.getJournalEntries(search, fromDate, toDate),
+        await reportService.getJournalEntries(
+          debouncedSearch,
+          fromDate,
+          toDate,
+        ),
       );
     } catch (value) {
       setError(
@@ -90,11 +134,14 @@ export const JournalEntriesScreen: React.FC<{ navigation: NavigationProp }> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [fromDate, search, toDate]);
+  }, [fromDate, debouncedSearch, toDate]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // 👈 إعادة جلب البيانات تلقائياً عند العودة للشاشة
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   if (isLoading) return <LoadingOverlay visible />;
   if (error) return <ScreenError message={error} onRetry={() => void load()} />;
@@ -637,22 +684,22 @@ const AccountMenu: React.FC<{
   );
 };
 
-const AccountReportScreen: React.FC<{
-  navigation: NavigationProp;
-  route?: AccountRoute;
-  title: string;
-  loadReport: (
-    accountId: string,
-    from?: Date,
-    to?: Date,
-  ) => Promise<LedgerReport>;
-}> = ({ navigation, route, title, loadReport }) => {
+const AccountReportScreen: React.FC<AccountReportScreenProps> = ({
+  navigation,
+  route,
+  title,
+  loadReport,
+}) => {
   const theme = useTheme();
   const { accounts, isLoading: accountsLoading } = useAccounts();
   const initialId = route?.params?.accountId;
   const [selected, setSelected] = useState<ChartOfAccount | null>(null);
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(undefined);
+
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+
   const [report, setReport] = useState<LedgerReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -678,6 +725,7 @@ const AccountReportScreen: React.FC<{
   }, [fromDate, loadReport, selected, toDate]);
 
   const rows = useMemo(() => report?.rows ?? [], [report]);
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
@@ -695,31 +743,64 @@ const AccountReportScreen: React.FC<{
           />
         )}
 
+        {/* ✅ اختيار التواريخ بشكل صحيح وديناميكي */}
         <View style={styles.row}>
-          <TextInput
-            label="من تاريخ"
-            value={fromDate ? fromDate.toISOString().slice(0, 10) : ""}
-            onChangeText={() => {}}
-            placeholder="YYYY-MM-DD"
-            style={styles.dateInput}
-          />
-          <TextInput
-            label="إلى تاريخ"
-            value={toDate ? toDate.toISOString().slice(0, 10) : ""}
-            onChangeText={() => {}}
-            placeholder="YYYY-MM-DD"
-            style={styles.dateInput}
-          />
+          <TouchableOpacity
+            style={[styles.dateBtn, { borderColor: theme.colors.outline }]}
+            onPress={() => setShowFromPicker(true)}
+          >
+            <AppIcon name="calendar" size={16} color={theme.colors.primary} />
+            <Text variant="bodySmall" style={{ marginLeft: 4 }}>
+              {fromDate ? formatDate(fromDate.getTime()) : "من تاريخ"}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.dateBtn, { borderColor: theme.colors.outline }]}
+            onPress={() => setShowToPicker(true)}
+          >
+            <AppIcon name="calendar" size={16} color={theme.colors.primary} />
+            <Text variant="bodySmall" style={{ marginLeft: 4 }}>
+              {toDate ? formatDate(toDate.getTime()) : "إلى تاريخ"}
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {showFromPicker && (
+          <DateTimePicker
+            value={fromDate || new Date()}
+            mode="date"
+            display="default"
+            onChange={(e, date) => {
+              setShowFromPicker(Platform.OS === "ios");
+              if (date) setFromDate(date);
+            }}
+          />
+        )}
+        {showToPicker && (
+          <DateTimePicker
+            value={toDate || new Date()}
+            mode="date"
+            display="default"
+            onChange={(e, date) => {
+              setShowToPicker(Platform.OS === "ios");
+              if (date) setToDate(date);
+            }}
+          />
+        )}
+
         <Button
           mode="contained"
           disabled={!selected || isLoading}
           loading={isLoading}
           onPress={() => void load()}
+          style={{ marginTop: 8 }}
         >
           عرض التقرير
         </Button>
+
         {error && <ScreenError message={error} onRetry={() => void load()} />}
+
         {report && (
           <>
             <Card mode="outlined" style={styles.card}>
@@ -765,28 +846,6 @@ const AccountReportScreen: React.FC<{
     </SafeAreaView>
   );
 };
-
-export const GeneralLedgerScreen: React.FC<{
-  navigation: NavigationProp;
-  route?: AccountRoute;
-}> = (props) => (
-  <AccountReportScreen
-    {...props}
-    title="الأستاذ العام"
-    loadReport={reportService.getGeneralLedger}
-  />
-);
-
-export const AccountStatementScreen: React.FC<{
-  navigation: NavigationProp;
-  route?: AccountRoute;
-}> = (props) => (
-  <AccountReportScreen
-    {...props}
-    title="كشف الحساب"
-    loadReport={reportService.getAccountStatement}
-  />
-);
 
 export const TrialBalanceScreen: React.FC<{ navigation: NavigationProp }> = ({
   navigation,
